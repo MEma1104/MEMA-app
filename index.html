@@ -26,6 +26,239 @@
     width: 100%;
   }
 
+  /* INTRO SCREEN */
+  #introScreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #1a1c24 0%, #0a0c12 100%);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.5s ease, visibility 0.5s ease;
+  }
+
+  #introScreen.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .food-image-container {
+    position: relative;
+    width: 200px;
+    height: 200px;
+    margin-bottom: 30px;
+    animation: explodeIn 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+  }
+
+  .food-image {
+    width: 100%;
+    height: 100%;
+    border-radius: 30px;
+    object-fit: cover;
+    box-shadow: 0 20px 60px rgba(255, 107, 107, 0.4);
+    border: 4px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .food-particles {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    transform: translate(-50%, -50%);
+  }
+
+  .particle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: linear-gradient(135deg, #ff6b6b, #ff9f4a);
+    border-radius: 50%;
+    opacity: 0;
+    animation: particleBurst 1.5s ease-out forwards;
+  }
+
+  .particle:nth-child(1) { top: 0; left: 50%; animation-delay: 0.3s; }
+  .particle:nth-child(2) { top: 50%; right: 0; animation-delay: 0.4s; }
+  .particle:nth-child(3) { bottom: 0; left: 50%; animation-delay: 0.5s; }
+  .particle:nth-child(4) { top: 50%; left: 0; animation-delay: 0.6s; }
+  .particle:nth-child(5) { top: 20%; right: 20%; animation-delay: 0.7s; }
+  .particle:nth-child(6) { bottom: 20%; left: 20%; animation-delay: 0.8s; }
+
+  @keyframes explodeIn {
+    0% {
+      transform: scale(0) rotate(-180deg);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.2) rotate(10deg);
+    }
+    100% {
+      transform: scale(1) rotate(0deg);
+      opacity: 1;
+    }
+  }
+
+  @keyframes particleBurst {
+    0% {
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(var(--tx, 100px), var(--ty, -100px)) scale(0);
+      opacity: 0;
+    }
+  }
+
+  .intro-logo-container {
+    text-align: center;
+    opacity: 0;
+    animation: fadeInUp 0.8s ease forwards;
+    animation-delay: 1s;
+  }
+
+  .intro-logo {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 3.5rem;
+    font-weight: 900;
+    letter-spacing: 5px;
+    background: linear-gradient(135deg, #ff6b6b 0%, #ff9f4a 50%, #ff6b6b 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 60px rgba(255,107,107,0.5);
+    margin-bottom: 10px;
+  }
+
+  .intro-tagline {
+    font-size: 1rem;
+    color: #aaa;
+    letter-spacing: 2px;
+    margin-bottom: 40px;
+  }
+
+  .intro-tagline .brand-m { color: #ff6b6b; font-weight: 600; }
+  .intro-tagline .brand-e { color: #ff8a5c; font-weight: 600; }
+  .intro-tagline .brand-m2 { color: #ff9f4a; font-weight: 600; }
+  .intro-tagline .brand-a { color: #ff6b6b; font-weight: 600; }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .intro-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 80%;
+    max-width: 300px;
+    opacity: 0;
+    animation: fadeInUp 0.8s ease forwards;
+    animation-delay: 1.4s;
+  }
+
+  .intro-btn {
+    padding: 18px 30px;
+    border: none;
+    border-radius: 25px;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  .intro-btn-comerciant {
+    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .intro-btn-client {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ff9f4a 100%);
+    color: white;
+    box-shadow: 0 10px 30px rgba(255,107,107,0.4);
+  }
+
+  .intro-btn:active {
+    transform: scale(0.95);
+  }
+
+  /* MERCHANT PAGE (Empty for now) */
+  #merchantPage {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #1a1c24 0%, #0a0c12 100%);
+    z-index: 9999;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  #merchantPage.visible {
+    display: flex;
+  }
+
+  .merchant-content {
+    text-align: center;
+  }
+
+  .merchant-logo {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #ff6b6b 0%, #ff9f4a 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 20px;
+  }
+
+  .merchant-text {
+    color: #aaa;
+    font-size: 1.1rem;
+    margin-bottom: 30px;
+    line-height: 1.6;
+  }
+
+  .back-btn {
+    padding: 15px 40px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 25px;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .back-btn:active {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(0.95);
+  }
+
+  /* MAIN APP */
   #map {
     position: absolute;
     top: 0;
@@ -46,14 +279,14 @@
   }
 
   .panel-container.minimized {
-    transform: translateY(calc(-100% + 160px));
+    transform: translateY(calc(-100% + 110px));
   }
 
   .center-card {
     background: rgba(0, 0, 0, 0.92);
     backdrop-filter: blur(25px);
     border-radius: 25px;
-    padding: 20px;
+    padding: 15px;
     border: 2px solid rgba(255, 107, 107, 0.2);
     box-shadow: 0 20px 60px rgba(0,0,0,0.8);
     display: flex;
@@ -62,14 +295,14 @@
 
   .header {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     pointer-events: none;
     flex-shrink: 0;
   }
 
   .logo {
     font-family: 'Montserrat', sans-serif;
-    font-size: 2.5rem;
+    font-size: 2rem;
     font-weight: 900;
     letter-spacing: 3px;
     margin-bottom: 5px;
@@ -87,7 +320,7 @@
   }
 
   .tagline {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 400;
     letter-spacing: 1px;
     color: #aaa;
@@ -115,7 +348,7 @@
 
   .swipe-area {
     width: 100%;
-    padding: 15px 0 5px 0;
+    padding: 8px 0 5px 0;
     cursor: grab;
     touch-action: pan-y;
     user-select: none;
@@ -124,8 +357,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
-    margin-top: 10px;
+    gap: 3px;
+    margin-top: 8px;
     border-top: 1px solid rgba(255,255,255,0.1);
   }
 
@@ -135,13 +368,13 @@
 
   .drag-line {
     width: 40px;
-    height: 5px;
+    height: 4px;
     background: rgba(255,255,255,0.3);
     border-radius: 3px;
   }
 
   .swipe-arrow {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     color: #ff9f4a;
     animation: bounceArrow 1.5s ease-in-out infinite;
     transition: transform 0.3s ease;
@@ -153,31 +386,31 @@
 
   @keyframes bounceArrow {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
+    50% { transform: translateY(-3px); }
   }
 
   @keyframes bounceArrowUp {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(5px); }
+    50% { transform: translateY(3px); }
   }
 
   .swipe-hint {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: #666;
-    margin-top: 5px;
+    margin-top: 2px;
   }
 
   .gps-button {
     width: 100%;
-    padding: 15px;
+    padding: 12px;
     background: linear-gradient(135deg, #ff6b6b 0%, #ff9f4a 100%);
     color: white;
     border: none;
     border-radius: 20px;
     font-weight: 800;
-    font-size: 1rem;
+    font-size: 0.9rem;
     cursor: pointer;
-    margin-bottom: 15px;
+    margin-bottom: 12px;
     box-shadow: 0 10px 30px rgba(255,107,107,0.4);
     transition: all 0.3s;
     display: flex;
@@ -193,8 +426,8 @@
   }
 
   .gps-icon {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border: 2px solid white;
     border-radius: 50%;
     position: relative;
@@ -206,8 +439,8 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     background: white;
     border-radius: 50%;
     transform: translate(-50%, -50%);
@@ -222,8 +455,8 @@
   .filters {
     display: flex;
     flex-direction: column;
-    gap: 15px;
-    margin-bottom: 15px;
+    gap: 12px;
+    margin-bottom: 12px;
   }
 
   .filter-row {
@@ -233,7 +466,7 @@
   }
 
   .filter-label {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: #aaa;
     display: flex;
     align-items: center;
@@ -243,7 +476,7 @@
   .filter-value {
     color: #ff9f4a;
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
   }
 
   input[type="range"] {
@@ -258,8 +491,8 @@
 
   input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     background: linear-gradient(135deg, #ff6b6b, #ff9f4a);
     border-radius: 50%;
     cursor: pointer;
@@ -269,15 +502,15 @@
 
   .search-btn {
     width: 100%;
-    padding: 18px;
+    padding: 15px;
     background: white;
     color: #0a0c12;
     border: none;
     border-radius: 20px;
     font-weight: 900;
-    font-size: 1rem;
+    font-size: 0.95rem;
     cursor: pointer;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     transition: all 0.3s;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -289,9 +522,9 @@
 
   .status {
     text-align: center;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: #888;
-    min-height: 20px;
+    min-height: 18px;
   }
 
   .info-card {
@@ -420,6 +653,50 @@
 </head>
 <body>
 
+<!-- INTRO SCREEN -->
+<div id="introScreen">
+  <div class="food-image-container">
+    <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=400&fit=crop" alt="Delicious Food" class="food-image">
+    <div class="food-particles">
+      <div class="particle" style="--tx: 80px; --ty: -80px;"></div>
+      <div class="particle" style="--tx: -80px; --ty: -80px;"></div>
+      <div class="particle" style="--tx: 80px; --ty: 80px;"></div>
+      <div class="particle" style="--tx: -80px; --ty: 80px;"></div>
+      <div class="particle" style="--tx: 100px; --ty: 0px;"></div>
+      <div class="particle" style="--tx: -100px; --ty: 0px;"></div>
+    </div>
+  </div>
+  
+  <div class="intro-logo-container">
+    <div class="intro-logo">MEMA</div>
+    <div class="intro-tagline">
+      <span class="brand-m">M</span>ănânci <span class="brand-e">E</span>conomic, <span class="brand-m2">M</span>ănânci <span class="brand-a">A</span>proape
+    </div>
+  </div>
+  
+  <div class="intro-buttons">
+    <button class="intro-btn intro-btn-comerciant" onclick="openMerchant()">
+      🏪 COMERCIANT
+    </button>
+    <button class="intro-btn intro-btn-client" onclick="openClient()">
+      🍽️ CLIENT
+    </button>
+  </div>
+</div>
+
+<!-- MERCHANT PAGE (Empty for now) -->
+<div id="merchantPage">
+  <div class="merchant-content">
+    <div class="merchant-logo">MEMA</div>
+    <div class="merchant-text">
+      Zona Comercianți<br>
+      <span style="font-size: 0.9rem; color: #666;">(În curând mai multe funcții)</span>
+    </div>
+    <button class="back-btn" onclick="backToIntro()">← Înapoi la meniu</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
 <div id="map"></div>
 
 <div class="panel-container" id="panelContainer">
@@ -501,10 +778,28 @@ const els = {
   infoCard: document.getElementById('infoCard'),
   placeName: document.getElementById('placeName'),
   placePrice: document.getElementById('placePrice'),
-  placeAddress: document.getElementById('placeAddress')
+  placeAddress: document.getElementById('placeAddress'),
+  introScreen: document.getElementById('introScreen'),
+  merchantPage: document.getElementById('merchantPage')
 };
 
-// Swipe handling - mereu pe zona de jos
+// Intro functions
+function openMerchant() {
+  els.introScreen.classList.add('hidden');
+  els.merchantPage.classList.add('visible');
+}
+
+function openClient() {
+  els.introScreen.classList.add('hidden');
+  initMap();
+}
+
+function backToIntro() {
+  els.merchantPage.classList.remove('visible');
+  els.introScreen.classList.remove('hidden');
+}
+
+// Swipe handling
 let touchStartY = 0;
 let touchEndY = 0;
 let isDragging = false;
@@ -513,7 +808,6 @@ els.swipeArea.addEventListener('touchstart', handleTouchStart, {passive: true});
 els.swipeArea.addEventListener('touchmove', handleTouchMove, {passive: true});
 els.swipeArea.addEventListener('touchend', handleTouchEnd, {passive: true});
 
-// Mouse events for desktop testing
 els.swipeArea.addEventListener('mousedown', handleMouseDown);
 document.addEventListener('mousemove', handleMouseMove);
 document.addEventListener('mouseup', handleMouseUp);
@@ -557,10 +851,8 @@ function handleSwipe() {
   
   if (Math.abs(diff) > swipeThreshold) {
     if (diff > 0 && !isMinimized) {
-      // Swipe up - minimize
       minimizePanel();
     } else if (diff < 0 && isMinimized) {
-      // Swipe down - expand
       expandPanel();
     }
   }
@@ -580,7 +872,9 @@ function expandPanel() {
   els.swipeHint.textContent = 'Swipe în sus pentru a minimiza';
 }
 
-window.onload = function() {
+function initMap() {
+  if (map) return;
+  
   map = L.map('map', {zoomControl: false}).setView([44.4325, 26.1038], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -598,11 +892,10 @@ window.onload = function() {
     els.budgetValue.textContent = this.value + ' lei';
   });
   
-  // Click pe harta închide info card
   map.on('click', () => {
     els.infoCard.classList.remove('visible');
   });
-};
+}
 
 function getLocation() {
   if (!navigator.geolocation) {
@@ -717,7 +1010,6 @@ out body center;`;
     places.sort((a,b) => a.dist - b.dist);
     
     places.forEach((p, i) => {
-      // Marker cu preț în loc de număr
       const icon = L.divIcon({
         html: `<div class="custom-marker">${p.price} lei</div>`,
         className: '',
