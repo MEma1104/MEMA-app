@@ -41,11 +41,12 @@
     left: 10px;
     right: 10px;
     z-index: 1000;
-    transition: transform 0.3s ease;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    touch-action: pan-y;
   }
 
   .panel-container.minimized {
-    transform: translateY(calc(-100% + 60px));
+    transform: translateY(calc(-100% + 160px));
   }
 
   .center-card {
@@ -55,20 +56,15 @@
     padding: 20px;
     border: 2px solid rgba(255, 107, 107, 0.2);
     box-shadow: 0 20px 60px rgba(0,0,0,0.8);
-  }
-
-  .drag-handle {
-    width: 40px;
-    height: 5px;
-    background: rgba(255,255,255,0.3);
-    border-radius: 3px;
-    margin: 0 auto 15px auto;
-    cursor: pointer;
+    display: flex;
+    flex-direction: column;
   }
 
   .header {
     text-align: center;
     margin-bottom: 20px;
+    pointer-events: none;
+    flex-shrink: 0;
   }
 
   .logo {
@@ -108,11 +104,67 @@
   .content-area {
     transition: max-height 0.3s ease, opacity 0.3s ease;
     overflow: hidden;
+    flex: 1;
   }
 
   .panel-container.minimized .content-area {
     max-height: 0;
     opacity: 0;
+    pointer-events: none;
+  }
+
+  .swipe-area {
+    width: 100%;
+    padding: 15px 0 5px 0;
+    cursor: grab;
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    margin-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .swipe-area:active {
+    cursor: grabbing;
+  }
+
+  .drag-line {
+    width: 40px;
+    height: 5px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 3px;
+  }
+
+  .swipe-arrow {
+    font-size: 1.5rem;
+    color: #ff9f4a;
+    animation: bounceArrow 1.5s ease-in-out infinite;
+    transition: transform 0.3s ease;
+  }
+
+  .panel-container.minimized .swipe-arrow {
+    animation: bounceArrowUp 1.5s ease-in-out infinite;
+  }
+
+  @keyframes bounceArrow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+
+  @keyframes bounceArrowUp {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(5px); }
+  }
+
+  .swipe-hint {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 5px;
   }
 
   .gps-button {
@@ -242,18 +294,6 @@
     min-height: 20px;
   }
 
-  .minimized-hint {
-    display: none;
-    text-align: center;
-    font-size: 0.7rem;
-    color: #666;
-    margin-top: 5px;
-  }
-
-  .panel-container.minimized .minimized-hint {
-    display: block;
-  }
-
   .info-card {
     position: absolute;
     bottom: 20px;
@@ -329,18 +369,20 @@
   }
 
   .custom-marker {
-    width: 36px;
+    min-width: 50px;
     height: 36px;
     background: linear-gradient(135deg, #ff6b6b, #ff9f4a);
-    border-radius: 50%;
+    border-radius: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 900;
-    font-size: 1rem;
+    font-size: 0.85rem;
     color: white;
     border: 3px solid white;
     box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+    padding: 0 10px;
+    white-space: nowrap;
   }
 
   .user-marker {
@@ -382,8 +424,6 @@
 
 <div class="panel-container" id="panelContainer">
   <div class="center-card">
-    <div class="drag-handle" onclick="togglePanel()"></div>
-    
     <div class="header">
       <div class="logo">MEMA</div>
       <div class="tagline">
@@ -420,7 +460,11 @@
       <div class="status" id="status">Apasă LOCALIZEAZĂ-MĂ pentru a începe</div>
     </div>
     
-    <div class="minimized-hint">Atinge aici pentru a deschide</div>
+    <div class="swipe-area" id="swipeArea">
+      <div class="drag-line"></div>
+      <div class="swipe-arrow" id="swipeArrow">⇡</div>
+      <div class="swipe-hint" id="swipeHint">Swipe în sus pentru a minimiza</div>
+    </div>
   </div>
 </div>
 
@@ -446,6 +490,9 @@ let isMinimized = false;
 const els = {
   panelContainer: document.getElementById('panelContainer'),
   contentArea: document.getElementById('contentArea'),
+  swipeArea: document.getElementById('swipeArea'),
+  swipeArrow: document.getElementById('swipeArrow'),
+  swipeHint: document.getElementById('swipeHint'),
   radiusSlider: document.getElementById('radiusSlider'),
   radiusValue: document.getElementById('radiusValue'),
   budgetSlider: document.getElementById('budgetSlider'),
@@ -457,13 +504,80 @@ const els = {
   placeAddress: document.getElementById('placeAddress')
 };
 
-function togglePanel() {
-  isMinimized = !isMinimized;
-  if (isMinimized) {
-    els.panelContainer.classList.add('minimized');
-  } else {
-    els.panelContainer.classList.remove('minimized');
+// Swipe handling - mereu pe zona de jos
+let touchStartY = 0;
+let touchEndY = 0;
+let isDragging = false;
+
+els.swipeArea.addEventListener('touchstart', handleTouchStart, {passive: true});
+els.swipeArea.addEventListener('touchmove', handleTouchMove, {passive: true});
+els.swipeArea.addEventListener('touchend', handleTouchEnd, {passive: true});
+
+// Mouse events for desktop testing
+els.swipeArea.addEventListener('mousedown', handleMouseDown);
+document.addEventListener('mousemove', handleMouseMove);
+document.addEventListener('mouseup', handleMouseUp);
+
+function handleTouchStart(e) {
+  touchStartY = e.changedTouches[0].screenY;
+  isDragging = true;
+}
+
+function handleMouseDown(e) {
+  touchStartY = e.screenY;
+  isDragging = true;
+  e.preventDefault();
+}
+
+function handleTouchMove(e) {
+  if (!isDragging) return;
+  touchEndY = e.changedTouches[0].screenY;
+}
+
+function handleMouseMove(e) {
+  if (!isDragging) return;
+  touchEndY = e.screenY;
+}
+
+function handleTouchEnd(e) {
+  if (!isDragging) return;
+  isDragging = false;
+  handleSwipe();
+}
+
+function handleMouseUp(e) {
+  if (!isDragging) return;
+  isDragging = false;
+  handleSwipe();
+}
+
+function handleSwipe() {
+  const swipeThreshold = 50;
+  const diff = touchStartY - touchEndY;
+  
+  if (Math.abs(diff) > swipeThreshold) {
+    if (diff > 0 && !isMinimized) {
+      // Swipe up - minimize
+      minimizePanel();
+    } else if (diff < 0 && isMinimized) {
+      // Swipe down - expand
+      expandPanel();
+    }
   }
+}
+
+function minimizePanel() {
+  isMinimized = true;
+  els.panelContainer.classList.add('minimized');
+  els.swipeArrow.textContent = '⇣';
+  els.swipeHint.textContent = 'Swipe în jos pentru a deschide';
+}
+
+function expandPanel() {
+  isMinimized = false;
+  els.panelContainer.classList.remove('minimized');
+  els.swipeArrow.textContent = '⇡';
+  els.swipeHint.textContent = 'Swipe în sus pentru a minimiza';
 }
 
 window.onload = function() {
@@ -603,11 +717,12 @@ out body center;`;
     places.sort((a,b) => a.dist - b.dist);
     
     places.forEach((p, i) => {
+      // Marker cu preț în loc de număr
       const icon = L.divIcon({
-        html: `<div class="custom-marker">${i+1}</div>`,
+        html: `<div class="custom-marker">${p.price} lei</div>`,
         className: '',
-        iconSize: [36, 36],
-        iconAnchor: [18, 36]
+        iconSize: [50, 36],
+        iconAnchor: [25, 36]
       });
       
       const marker = L.marker([p.lat, p.lng], {icon}).addTo(map);
