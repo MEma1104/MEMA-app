@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setări Notificări</title>
+    <script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async></script>
+    <script src="js/onesignal.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; margin-bottom: 5px; }
+        .subtitle { color: #666; margin-bottom: 25px; }
+        .section { margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+        .section:last-child { border-bottom: none; }
+        .section-title { font-size: 18px; font-weight: bold; color: #444; margin-bottom: 15px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        .checkbox-group { display: flex; flex-direction: column; gap: 10px; }
+        .checkbox-item { display: flex; align-items: center; gap: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px; cursor: pointer; }
+        .checkbox-item input { width: auto; }
+        .range-group { display: flex; align-items: center; gap: 15px; }
+        .range-group input[type="range"] { flex: 1; }
+        .range-value { min-width: 50px; text-align: center; font-weight: bold; color: #667eea; }
+        .btn { background: #667eea; color: white; border: none; padding: 15px; border-radius: 5px; cursor: pointer; width: 100%; font-size: 16px; margin-top: 10px; }
+        .btn:hover { background: #5568d3; }
+        .success { display: none; background: #d4edda; color: #155724; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+        .notification-status { display: flex; align-items: center; gap: 10px; padding: 15px; background: #f8f9fa; border-radius: 5px; margin-bottom: 20px; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; background: #dc3545; }
+        .status-dot.active { background: #28a745; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚙️ Setări</h1>
+        <p class="subtitle">Gestionează preferințele pentru notificări</p>
+
+        <div id="successMsg" class="success">✅ Setări salvate cu succes!</div>
+
+        <!-- Status Notificări -->
+        <div class="section">
+            <div class="section-title">🔔 Status Notificări</div>
+            <div class="notification-status">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Se verifică...</span>
+                <button class="btn" id="toggleBtn" style="width: auto; padding: 8px 15px; font-size: 14px; margin: 0;">Activează</button>
+            </div>
+        </div>
+
+        <!-- Canale Notificare -->
+        <div class="section">
+            <div class="section-title">📱 Canale de Notificare</div>
+            <div class="checkbox-group">
+                <label class="checkbox-item">
+                    <input type="checkbox" id="pushNotif" checked>
+                    <span>Notificări Push</span>
+                </label>
+                <label class="checkbox-item">
+                    <input type="checkbox" id="emailNotif">
+                    <span>Notificări Email</span>
+                </label>
+                <label class="checkbox-item">
+                    <input type="checkbox" id="smsNotif">
+                    <span>Notificări SMS</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Frecvență -->
+        <div class="section">
+            <div class="section-title">⏰ Frecvență</div>
+            <div class="form-group">
+                <select id="frequency">
+                    <option value="immediate">Imediat</option>
+                    <option value="daily">Zilnic</option>
+                    <option value="weekly">Săptămânal</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Categorii Preferate -->
+        <div class="section">
+            <div class="section-title">🏷️ Categorii Preferate</div>
+            <div class="checkbox-group">
+                <label class="checkbox-item"><input type="checkbox" class="cat-pref" value="food"> Mâncare</label>
+                <label class="checkbox-item"><input type="checkbox" class="cat-pref" value="fashion"> Fashion</label>
+                <label class="checkbox-item"><input type="checkbox" class="cat-pref" value="electronics"> Electronice</label>
+                <label class="checkbox-item"><input type="checkbox" class="cat-pref" value="beauty"> Frumusețe</label>
+                <label class="checkbox-item"><input type="checkbox" class="cat-pref" value="sports"> Sport</label>
+                <label class="checkbox-item"><input type="checkbox" class="cat-pref" value="home"> Casă</label>
+                <label class="checkbox-item"><input type="checkbox" class="cat-pref" value="entertainment"> Divertisment</label>
+                <label class="checkbox-item"><input type="checkbox" class="cat-pref" value="travel"> Travel</label>
+            </div>
+        </div>
+
+        <!-- Rază Locație -->
+        <div class="section">
+            <div class="section-title">📍 Rază de Acțiune (km)</div>
+            <div class="range-group">
+                <input type="range" id="radius" min="1" max="100" value="10">
+                <span class="range-value" id="radiusValue">10 km</span>
+            </div>
+        </div>
+
+        <button class="btn" id="saveBtn">💾 Salvează Setările</button>
+    </div>
+
+    <script>
+        // CONFIGURARE - ÎNLOCUIȚI CU DATELE DVS.
+        const SUPABASE_URL = 'https://dkoafoncrgqtuzxwhahop.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRreGFmb25jcmdxdHV6d2hhaG9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzMjg3NzIsImV4cCI6MjA5MTkwNDc3Mn0.utucx0vlTZsg8t3LcWzReD-t6PFT23EaGl-LzQEX8JI';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Update range display
+        document.getElementById('radius').addEventListener('input', (e) => {
+            document.getElementById('radiusValue').textContent = e.target.value + ' km';
+        });
+
+        // Check notification status
+        async function checkStatus() {
+            try {
+                const isSubscribed = await OneSignalUtils.isSubscribed();
+                const dot = document.getElementById('statusDot');
+                const text = document.getElementById('statusText');
+                const btn = document.getElementById('toggleBtn');
+
+                if (isSubscribed) {
+                    dot.classList.add('active');
+                    text.textContent = 'Notificări activate';
+                    btn.textContent = 'Dezactivează';
+                    btn.onclick = async () => {
+                        await OneSignalUtils.unsubscribe();
+                        checkStatus();
+                    };
+                } else {
+                    dot.classList.remove('active');
+                    text.textContent = 'Notificări dezactivate';
+                    btn.textContent = 'Activează';
+                    btn.onclick = async () => {
+                        await OneSignalUtils.subscribe();
+                        checkStatus();
+                    };
+                }
+            } catch (e) {
+                console.error('Eroare:', e);
+            }
+        }
+
+        // Load preferences
+        async function loadPrefs() {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
+
+                await OneSignalUtils.setExternalUserId(user.id);
+
+                const { data: prefs } = await supabase
+                    .from('client_preferences')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (prefs) {
+                    document.getElementById('pushNotif').checked = prefs.push_notifications;
+                    document.getElementById('emailNotif').checked = prefs.email_notifications;
+                    document.getElementById('smsNotif').checked = prefs.sms_notifications;
+                    document.getElementById('frequency').value = prefs.notification_frequency;
+                    document.getElementById('radius').value = prefs.preferred_location_radius;
+                    document.getElementById('radiusValue').textContent = prefs.preferred_location_radius + ' km';
+
+                    if (prefs.preferred_categories) {
+                        prefs.preferred_categories.forEach(cat => {
+                            const cb = document.querySelector(`.cat-pref[value="${cat}"]`);
+                            if (cb) cb.checked = true;
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error('Eroare:', e);
+            }
+        }
+
+        // Save preferences
+        document.getElementById('saveBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('saveBtn');
+            btn.disabled = true;
+            btn.textContent = 'Se salvează...';
+
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) {
+                    alert('Trebuie să fii autentificat!');
+                    return;
+                }
+
+                const playerId = await OneSignalUtils.getPlayerId();
+                const categories = Array.from(document.querySelectorAll('.cat-pref:checked')).map(cb => cb.value);
+
+                const prefs = {
+                    user_id: user.id,
+                    preferred_categories: categories,
+                    preferred_location_radius: parseInt(document.getElementById('radius').value),
+                    push_notifications: document.getElementById('pushNotif').checked,
+                    email_notifications: document.getElementById('emailNotif').checked,
+                    sms_notifications: document.getElementById('smsNotif').checked,
+                    notification_frequency: document.getElementById('frequency').value,
+                    onesignal_player_id: playerId,
+                    updated_at: new Date().toISOString()
+                };
+
+                await supabase.from('client_preferences').upsert(prefs, { onConflict: 'user_id' });
+
+                await OneSignalUtils.setTags({
+                    user_id: user.id,
+                    categories: categories.join(',')
+                });
+
+                document.getElementById('successMsg').style.display = 'block';
+                setTimeout(() => document.getElementById('successMsg').style.display = 'none', 3000);
+
+            } catch (e) {
+                alert('Eroare: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '💾 Salvează Setările';
+            }
+        });
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            checkStatus();
+            loadPrefs();
+        });
+    </script>
+</body>
+</html>
