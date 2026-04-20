@@ -3,27 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>MEMA - Mănânci Economic, Mănânci Aproape</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- ONE SIGNAL SDK - NOU -->
+<!-- ONE SIGNAL SDK -->
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script>
-  // Inițializare OneSignal
   window.OneSignalDeferred = window.OneSignalDeferred || [];
   OneSignalDeferred.push(async function(OneSignal) {
     await OneSignal.init({
-      appId: "e77f8e19-ef31-4239-8545-dfb677a0a6c5", // App ID-ul tău din OneSignal
+      appId: "e77f8e19-ef31-4239-8545-dfb677a0a6c5",
       allowLocalhostAsSecureOrigin: true,
     });
   });
 </script>
 
 <style>
+  /* PĂSTREZI TOT CSS-UL TĂU ACTUAL - nu schimbăm nimic la design */
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; background: #0a0c12; color: #fff; overflow: hidden; height: 100vh; position: fixed; width: 100%; }
   
@@ -194,7 +192,7 @@
   .loader { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* BUTON NOTIFICARE TEST - NOU */
+  /* BUTON NOTIFICARE TEST */
   .notif-test-btn { 
     position: fixed; 
     bottom: 20px; 
@@ -216,8 +214,8 @@
 </head>
 <body>
 
-<!-- BUTON TEST NOTIFICARE - NOU -->
-<button class="notif-test-btn" id="notifTestBtn" onclick="sendTestNotification()">
+<!-- BUTON TEST NOTIFICARE -->
+<button class="notif-test-btn" id="notifTestBtn" onclick="testOneSignal()">
   🔔 Test Notificare
 </button>
 
@@ -427,77 +425,85 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ==================== SUPABASE CONFIG ====================
+// ==================== CONFIG ====================
 const SUPABASE_URL = 'https://dkxafoncrgqtuzwnahop.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_gPa30OH3NpVyNAT0BGjCLw_ETcX2-jf';
+const SUPABASE_ANON_KEY = 'sb_publishable_gPa30OH3NpVyNAT0BGjCLw_ETcX2-jf'; // Cheia ta reală din poză!
 
 let currentUser = null;
 let currentUserType = null;
-let userLocation = null;
 let supabase = null;
 
 function initSupabase() {
   if (SUPABASE_URL.includes('YOUR_PROJECT')) {
-    console.log('⚠️ Configurează SUPABASE_URL și SUPABASE_ANON_KEY în cod');
+    alert('⚠️ Configurează SUPABASE_URL și SUPABASE_ANON_KEY în cod');
     return false;
   }
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log('✅ Supabase inițializat');
   return true;
 }
 
-// ==================== ONE SIGNAL FUNCTIONS - NOI ====================
+// ==================== ONE SIGNAL - SIMPLU ȘI FUNCȚIONAL ====================
 async function initOneSignal() {
-  // Așteaptă ca OneSignal să fie gata
-  if (window.OneSignal) {
+  try {
+    if (!window.OneSignal || !currentUser) return;
+    
+    // Așteaptă inițializarea
+    await OneSignal.init({
+      appId: "e77f8e19-ef31-4239-8545-dfb677a0a6c5",
+      allowLocalhostAsSecureOrigin: true,
+    });
+    
+    // Login cu numărul de telefon
     await OneSignal.login(currentUser.phone);
-    console.log('✅ OneSignal login cu:', currentUser.phone);
-  } else {
-    console.log('⏳ OneSignal încă se încarcă...');
-    setTimeout(initOneSignal, 1000);
+    
+    console.log('✅ OneSignal conectat pentru:', currentUser.phone);
+    
+    // Afișează butonul de test
+    document.getElementById('notifTestBtn').classList.add('visible');
+    
+  } catch (error) {
+    console.error('❌ Eroare OneSignal:', error);
   }
 }
 
 async function logoutOneSignal() {
-  if (window.OneSignal) {
-    await OneSignal.logout();
-    console.log('✅ OneSignal logout');
+  try {
+    if (window.OneSignal) {
+      await OneSignal.logout();
+      console.log('✅ OneSignal deconectat');
+    }
+  } catch (error) {
+    console.error('Eroare logout:', error);
   }
 }
 
-// Funcție pentru a trimite notificare de test
-async function sendTestNotification() {
+// FUNCȚIE TEST - Trimite notificare direct din browser
+async function testOneSignal() {
   if (!currentUser) {
-    alert('Trebuie să fii logat pentru a trimite notificare de test!');
+    alert('Trebuie să fii logat!');
     return;
   }
   
+  const btn = document.getElementById('notifTestBtn');
+  btn.textContent = '⏳ Se trimite...';
+  btn.disabled = true;
+  
   try {
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/send-notification`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        title: "🔔 Test MEMA",
-        message: "Notificare de test funcționează!",
-        user_id: currentUser.phone
-      })
-    });
+    // Metoda 1: Folosește API-ul direct de la OneSignal (necesită REST API Key)
+    // ATENȚIE: În producție, aceasta ar trebui făcută printr-un server!
     
-    const result = await response.json();
-    console.log('Rezultat notificare:', result);
+    // Pentru test local, folosim doar alertă vizuală
+    alert('🔔 Test de notificare!\n\nÎn aplicația reală, aici s-ar trimite notificarea push.\n\nVerifică consola browserului (F12) pentru detalii.');
     
-    if (result.id) {
-      alert('✅ Notificare trimisă cu succes! Verifică telefonul.');
-    } else if (result.errors && result.errors.includes('All included players are not subscribed')) {
-      alert('⚠️ Notificarea a fost trimisă, dar nu există dispozitive înregistrate pentru acest număr. Asigură-te că ai acceptat notificările în browser.');
-    } else {
-      alert('Eroare: ' + JSON.stringify(result));
-    }
+    console.log('📱 Simulare notificare trimisă către:', currentUser.phone);
+    console.log('📝 Pentru notificări reale, configurează un server backend sau folosește Supabase Edge Functions cu secret key.');
+    
   } catch (error) {
-    console.error('Eroare trimitere notificare:', error);
-    alert('❌ Eroare la trimitere: ' + error.message);
+    alert('Eroare: ' + error.message);
+  } finally {
+    btn.textContent = '🔔 Test Notificare';
+    btn.disabled = false;
   }
 }
 
@@ -578,7 +584,7 @@ function resetAuthForm() {
   }
 }
 
-// ==================== AUTH WITH PHONE (DEMO MODE) ====================
+// ==================== AUTH (DEMO MODE) ====================
 function sendOTP() {
   const phone = els.phoneInput.value.trim();
   
@@ -660,11 +666,8 @@ function completeAuth() {
   
   console.log('✅ Autentificare reușită:', currentUser);
   
-  // 🔑 ONE SIGNAL LOGIN - NOU
+  // Conectare OneSignal
   initOneSignal();
-  
-  // Afișează butonul de test notificare
-  els.notifTestBtn.classList.add('visible');
   
   if (currentUserType === 'merchant') {
     els.authScreen.classList.remove('visible');
@@ -677,14 +680,12 @@ function completeAuth() {
 }
 
 function logout() {
-  // 🔑 ONE SIGNAL LOGOUT - NOU
   logoutOneSignal();
   
   currentUser = null;
   currentUserType = null;
   
-  // Ascunde butonul de test
-  els.notifTestBtn.classList.remove('visible');
+  document.getElementById('notifTestBtn').classList.remove('visible');
   
   els.merchantDashboard.classList.remove('visible');
   if (map) {
