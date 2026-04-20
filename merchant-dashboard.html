@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merchant Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, textarea, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .btn { background: #667eea; color: white; border: none; padding: 15px; border-radius: 5px; cursor: pointer; width: 100%; font-size: 16px; }
+        .btn:hover { background: #5568d3; }
+        .status { margin-top: 15px; padding: 10px; border-radius: 5px; display: none; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏪 Creare Ofertă</h1>
+        
+        <form id="offerForm">
+            <div class="form-group">
+                <label>Titlu *</label>
+                <input type="text" id="title" required placeholder="Ex: Reducere 50%">
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label>Categorie *</label>
+                    <select id="category" required>
+                        <option value="">Selectează...</option>
+                        <option value="food">Mâncare</option>
+                        <option value="fashion">Fashion</option>
+                        <option value="electronics">Electronice</option>
+                        <option value="beauty">Frumusețe</option>
+                        <option value="sports">Sport</option>
+                        <option value="home">Casă</option>
+                        <option value="entertainment">Divertisment</option>
+                        <option value="travel">Travel</option>
+                        <option value="health">Sănătate</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Reducere (%)</label>
+                    <input type="number" id="discount" min="0" max="100" placeholder="25">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Descriere *</label>
+                <textarea id="description" required rows="4" placeholder="Descriere ofertă..."></textarea>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label>Preț Original</label>
+                    <input type="number" id="originalPrice" step="0.01" placeholder="100.00">
+                </div>
+                <div class="form-group">
+                    <label>Preț Redus</label>
+                    <input type="number" id="discountedPrice" step="0.01" placeholder="75.00">
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label>Valabil de la *</label>
+                    <input type="datetime-local" id="validFrom" required>
+                </div>
+                <div class="form-group">
+                    <label>Valabil până la *</label>
+                    <input type="datetime-local" id="validUntil" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="sendNotification" checked>
+                    Trimite notificare push clienților
+                </label>
+            </div>
+
+            <button type="submit" class="btn">🚀 Publică Oferta</button>
+        </form>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        // CONFIGURARE - ÎNLOCUIȚI CU DATELE DVS.
+        const SUPABASE_URL = 'https://dkoafoncrgqtuzxwhahop.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRreGFmb25jcmdxdHV6d2hhaG9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzMjg3NzIsImV4cCI6MjA5MTkwNDc3Mn0.utucx0vlTZsg8t3LcWzReD-t6PFT23EaGl-LzQEX8JI';
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Setează date implicite
+        document.getElementById('validFrom').value = new Date().toISOString().slice(0, 16);
+        document.getElementById('validUntil').value = new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0, 16);
+
+        document.getElementById('offerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            try {
+                const offer = {
+                    title: document.getElementById('title').value,
+                    description: document.getElementById('description').value,
+                    category: document.getElementById('category').value,
+                    discount_percentage: parseInt(document.getElementById('discount').value) || null,
+                    original_price: parseFloat(document.getElementById('originalPrice').value) || null,
+                    discounted_price: parseFloat(document.getElementById('discountedPrice').value) || null,
+                    valid_from: document.getElementById('validFrom').value,
+                    valid_until: document.getElementById('validUntil').value,
+                    status: 'active'
+                };
+
+                const { data, error } = await supabase.from('offers').insert([offer]).select().single();
+                
+                if (error) throw error;
+
+                if (document.getElementById('sendNotification').checked) {
+                    await supabase.functions.invoke('send-offer-notification', {
+                        body: { offerId: data.id, title: data.title, category: data.category }
+                    });
+                }
+
+                document.getElementById('status').className = 'status success';
+                document.getElementById('status').style.display = 'block';
+                document.getElementById('status').textContent = '✅ Ofertă publicată cu succes!';
+                
+                document.getElementById('offerForm').reset();
+                
+            } catch (error) {
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').style.display = 'block';
+                document.getElementById('status').textContent = '❌ Eroare: ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html>
