@@ -1,7 +1,5 @@
 <!DOCTYPE html>
 <html lang="ro">
-<script src="https://cdn.onesignal.com/sdks/OneSignalSDK.js" async></script>
-<script src="js/onesignal.js"></script> 
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -11,6 +9,20 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- ONE SIGNAL SDK - NOU -->
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  // Inițializare OneSignal
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "e77f8e19-ef31-4239-8545-dfb677a0a6c5", // App ID-ul tău din OneSignal
+      allowLocalhostAsSecureOrigin: true,
+    });
+  });
+</script>
+
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; background: #0a0c12; color: #fff; overflow: hidden; height: 100vh; position: fixed; width: 100%; }
@@ -181,9 +193,33 @@
   
   .loader { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* BUTON NOTIFICARE TEST - NOU */
+  .notif-test-btn { 
+    position: fixed; 
+    bottom: 20px; 
+    right: 20px; 
+    z-index: 2000; 
+    padding: 12px 20px; 
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); 
+    color: white; 
+    border: none; 
+    border-radius: 25px; 
+    font-weight: 700; 
+    font-size: 0.85rem; 
+    cursor: pointer; 
+    box-shadow: 0 10px 30px rgba(99,102,241,0.4);
+    display: none;
+  }
+  .notif-test-btn.visible { display: block; }
 </style>
 </head>
 <body>
+
+<!-- BUTON TEST NOTIFICARE - NOU -->
+<button class="notif-test-btn" id="notifTestBtn" onclick="sendTestNotification()">
+  🔔 Test Notificare
+</button>
 
 <!-- INTRO SCREEN -->
 <div id="introScreen">
@@ -391,13 +427,14 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ==================== SUPABASE CONFIG - ÎNLOCUIEȘTE AICI ====================
-const SUPABASE_URL = 'https://dkxafoncrgqtuzwhahop.supabase.co';
+// ==================== SUPABASE CONFIG ====================
+const SUPABASE_URL = 'https://dkxafoncrgqtuzwnahop.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_gPa30OH3NpVyNAT0BGjCLw_ETcX2-jf';
 
 let currentUser = null;
 let currentUserType = null;
 let userLocation = null;
+let supabase = null;
 
 function initSupabase() {
   if (SUPABASE_URL.includes('YOUR_PROJECT')) {
@@ -406,6 +443,62 @@ function initSupabase() {
   }
   supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   return true;
+}
+
+// ==================== ONE SIGNAL FUNCTIONS - NOI ====================
+async function initOneSignal() {
+  // Așteaptă ca OneSignal să fie gata
+  if (window.OneSignal) {
+    await OneSignal.login(currentUser.phone);
+    console.log('✅ OneSignal login cu:', currentUser.phone);
+  } else {
+    console.log('⏳ OneSignal încă se încarcă...');
+    setTimeout(initOneSignal, 1000);
+  }
+}
+
+async function logoutOneSignal() {
+  if (window.OneSignal) {
+    await OneSignal.logout();
+    console.log('✅ OneSignal logout');
+  }
+}
+
+// Funcție pentru a trimite notificare de test
+async function sendTestNotification() {
+  if (!currentUser) {
+    alert('Trebuie să fii logat pentru a trimite notificare de test!');
+    return;
+  }
+  
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/send-notification`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        title: "🔔 Test MEMA",
+        message: "Notificare de test funcționează!",
+        user_id: currentUser.phone
+      })
+    });
+    
+    const result = await response.json();
+    console.log('Rezultat notificare:', result);
+    
+    if (result.id) {
+      alert('✅ Notificare trimisă cu succes! Verifică telefonul.');
+    } else if (result.errors && result.errors.includes('All included players are not subscribed')) {
+      alert('⚠️ Notificarea a fost trimisă, dar nu există dispozitive înregistrate pentru acest număr. Asigură-te că ai acceptat notificările în browser.');
+    } else {
+      alert('Eroare: ' + JSON.stringify(result));
+    }
+  } catch (error) {
+    console.error('Eroare trimitere notificare:', error);
+    alert('❌ Eroare la trimitere: ' + error.message);
+  }
 }
 
 // ==================== STATE MANAGEMENT ====================
@@ -437,7 +530,8 @@ const els = {
   verifyOtpBtn: document.getElementById('verifyOtpBtn'),
   locationForm: document.getElementById('locationForm'),
   menuForm: document.getElementById('menuForm'),
-  menuItemsList: document.getElementById('menuItemsList')
+  menuItemsList: document.getElementById('menuItemsList'),
+  notifTestBtn: document.getElementById('notifTestBtn')
 };
 
 let map;
@@ -566,6 +660,12 @@ function completeAuth() {
   
   console.log('✅ Autentificare reușită:', currentUser);
   
+  // 🔑 ONE SIGNAL LOGIN - NOU
+  initOneSignal();
+  
+  // Afișează butonul de test notificare
+  els.notifTestBtn.classList.add('visible');
+  
   if (currentUserType === 'merchant') {
     els.authScreen.classList.remove('visible');
     els.merchantDashboard.classList.add('visible');
@@ -577,8 +677,14 @@ function completeAuth() {
 }
 
 function logout() {
+  // 🔑 ONE SIGNAL LOGOUT - NOU
+  logoutOneSignal();
+  
   currentUser = null;
   currentUserType = null;
+  
+  // Ascunde butonul de test
+  els.notifTestBtn.classList.remove('visible');
   
   els.merchantDashboard.classList.remove('visible');
   if (map) {
