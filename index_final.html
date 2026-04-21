@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>MEMA - Mănânci Economic, Mănânci Aproape</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    await OneSignal.init({
+      appId: "e77f8e19-ef31-4239-8545-dfb677a0a6c5",
+      notifyButton: { enable: false }
+    });
+  });
+</script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; background: #0a0c12; color: #fff; overflow: hidden; height: 100vh; position: fixed; width: 100%; }
+
+  #introScreen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #1a1c24 0%, #0a0c12 100%); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 40px; transition: opacity 0.5s ease, visibility 0.5s ease; }
+  #introScreen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+  .food-image-container { position: relative; width: 250px; height: 250px; margin-bottom: 30px; }
+  .food-image { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; box-shadow: 0 20px 60px rgba(255, 107, 107, 0.6); border: 5px solid rgba(255, 255, 255, 0.2); animation: foodExplode 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards; }
+  @keyframes foodExplode { 0% { transform: scale(0) rotate(-180deg); opacity: 0; } 60% { transform: scale(1.4) rotate(10deg); filter: brightness(1.3); } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+
+  .explosion-container { position: absolute; top: 50%; left: 50%; width: 100%; height: 100%; transform: translate(-50%, -50%); pointer-events: none; }
+  .explosion-particle { position: absolute; width: 8px; height: 8px; border-radius: 50%; top: 50%; left: 50%; opacity: 0; animation: particleFly 1.8s ease-out forwards; }
+  .explosion-particle:nth-child(1) { background: #ff6b6b; animation-delay: 0.1s; --tx: 120px; --ty: -80px; }
+  .explosion-particle:nth-child(2) { background: #ff9f4a; animation-delay: 0.15s; --tx: -100px; --ty: -120px; }
+  .explosion-particle:nth-child(3) { background: #ffd93d; animation-delay: 0.2s; --tx: 80px; --ty: 100px; }
+  .explosion-particle:nth-child(4) { background: #6bcf7f; animation-delay: 0.25s; --tx: -120px; --ty: 60px; }
+  .explosion-particle:nth-child(5) { background: #4ecdc4; animation-delay: 0.3s; --tx: 140px; --ty: 20px; }
+  .explosion-particle:nth-child(6) { background: #ff6b9d; animation-delay: 0.35s; --tx: -60px; --ty: 140px; }
+  .explosion-particle:nth-child(7) { background: #c44569; animation-delay: 0.4s; --tx: 40px; --ty: -140px; }
+  .explosion-particle:nth-child(8) { background: #f8b500; animation-delay: 0.45s; --tx: -140px; --ty: -40px; }
+  .explosion-particle:nth-child(9) { background: #ff6b6b; animation-delay: 0.5s; --tx: 100px; --ty: 80px; }
+  .explosion-particle:nth-child(10) { background: #ff9f4a; animation-delay: 0.55s; --tx: -80px; --ty: -100px; }
+  .explosion-particle:nth-child(11) { background: #ffd93d; animation-delay: 0.6s; --tx: 160px; --ty: -20px; }
+  .explosion-particle:nth-child(12) { background: #6bcf7f; animation-delay: 0.65s; --tx: -160px; --ty: 20px; }
+  .explosion-particle:nth-child(13) { background: #4ecdc4; animation-delay: 0.7s; --tx: 20px; --ty: 160px; }
+  .explosion-particle:nth-child(14) { background: #ff6b9d; animation-delay: 0.75s; --tx: -20px; --ty: -160px; }
+  .explosion-particle:nth-child(15) { background: #ff6b6b; animation-delay: 0.8s; --tx: 60px; --ty: -60px; }
+  .explosion-particle:nth-child(16) { background: #ffd93d; animation-delay: 0.85s; --tx: -60px; --ty: 60px; }
+  @keyframes particleFly { 0% { transform: translate(-50%, -50%) scale(0); opacity: 1; } 50% { opacity: 1; } 100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0); opacity: 0; } }
+
+  .intro-logo-container { text-align: center; opacity: 0; animation: fadeInUp 0.8s ease forwards; animation-delay: 1.2s; margin-bottom: 20px; }
+  .intro-logo { font-family: 'Montserrat', sans-serif; font-size: 3.5rem; font-weight: 900; letter-spacing: 6px; background: linear-gradient(135deg, #ff6b6b 0%, #ff9f4a 50%, #ff6b6b 100%); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 60px rgba(255,107,107,0.5); margin-bottom: 10px; }
+  .intro-tagline { font-size: 0.95rem; color: #aaa; letter-spacing: 2px; }
+  .intro-tagline .brand-m { color: #ff6b6b; font-weight: 600; }
+  .intro-tagline .brand-e { color: #ff8a5c; font-weight: 600; }
+  .intro-tagline .brand-m2 { color: #ff9f4a; font-weight: 600; }
+  .intro-tagline .brand-a { color: #ff6b6b; font-weight: 600; }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+  .intro-buttons { display: flex; flex-direction: column; align-items: center; gap: 20px; width: 85%; max-width: 320px; opacity: 0; animation: fadeInUp 0.8s ease forwards; animation-delay: 1.6s; margin-top: 40px; }
+  .intro-btn-client { width: 100%; padding: 22px 40px; background: linear-gradient(135deg, #ff6b6b 0%, #ff8a5c 50%, #ff9f4a 100%); color: white; border: none; border-radius: 30px; font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 1.4rem; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 4px; box-shadow: 0 15px 40px rgba(255,107,107,0.5); }
+  .intro-btn-client:active { transform: scale(0.95); box-shadow: 0 10px 30px rgba(255,107,107,0.4); }
+  .intro-btn-comerciant { width: 45%; padding: 12px 20px; background: transparent; color: #666; border: 2px solid #444; border-radius: 20px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 0.75rem; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; }
+  .intro-btn-comerciant:active { background: rgba(255,255,255,0.05); transform: scale(0.95); }
+
+  #authScreen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #1a1c24 0%, #0a0c12 100%); z-index: 9998; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+  #authScreen.visible { display: flex; }
+  .auth-container { width: 100%; max-width: 350px; text-align: center; }
+  .auth-title { font-family: 'Montserrat', sans-serif; font-size: 1.8rem; font-weight: 800; margin-bottom: 10px; color: white; }
+  .auth-subtitle { color: #888; font-size: 0.9rem; margin-bottom: 30px; }
+  .auth-type-badge { display: inline-block; padding: 8px 20px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 30px; }
+  .auth-type-badge.merchant { background: rgba(107, 114, 128, 0.3); color: #9ca3af; border: 2px solid #4b5563; }
+  .auth-type-badge.client { background: rgba(255, 107, 107, 0.2); color: #ff9f4a; border: 2px solid rgba(255, 107, 107, 0.4); }
+
+  .phone-input-container { position: relative; margin-bottom: 20px; }
+  .phone-prefix { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #888; font-size: 1rem; font-weight: 600; }
+  .phone-input { width: 100%; padding: 18px 18px 18px 55px; background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 15px; color: white; font-size: 1.1rem; font-family: 'Poppins', sans-serif; outline: none; transition: all 0.3s; }
+  .phone-input:focus { border-color: #ff6b6b; background: rgba(255, 255, 255, 0.08); }
+  .phone-input::placeholder { color: #555; }
+
+  .otp-container { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+  .otp-input { width: 50px; height: 60px; background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 15px; color: white; font-size: 1.5rem; text-align: center; font-family: 'Poppins', sans-serif; outline: none; transition: all 0.3s; }
+  .otp-input:focus { border-color: #ff6b6b; background: rgba(255, 255, 255, 0.08); }
+
+  .auth-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, #ff6b6b 0%, #ff9f4a 100%); color: white; border: none; border-radius: 15px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 1rem; cursor: pointer; transition: all 0.3s; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; }
+  .auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .auth-btn:active:not(:disabled) { transform: scale(0.98); }
+  .auth-back-btn { background: transparent; border: none; color: #666; font-size: 0.9rem; cursor: pointer; padding: 10px; }
+  .auth-back-btn:active { color: #888; }
+  .auth-error { color: #ff6b6b; font-size: 0.85rem; margin-bottom: 15px; min-height: 20px; }
+
+  #merchantDashboard { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0a0c12; z-index: 9997; display: none; flex-direction: column; overflow-y: auto; }
+  #merchantDashboard.visible { display: flex; }
+  .merchant-header { background: linear-gradient(135deg, #1a1c24 0%, #0a0c12 100%); padding: 20px; border-bottom: 1px solid rgba(255, 107, 107, 0.2); position: sticky; top: 0; z-index: 100; }
+  .merchant-header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+  .merchant-title { font-family: 'Montserrat', sans-serif; font-size: 1.5rem; font-weight: 800; color: white; }
+  .merchant-logout { background: rgba(255, 107, 107, 0.2); border: 1px solid rgba(255, 107, 107, 0.3); color: #ff9f4a; padding: 8px 15px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
+  .merchant-tabs { display: flex; gap: 10px; }
+  .merchant-tab { flex: 1; padding: 12px; background: rgba(255, 255, 255, 0.05); border: none; border-radius: 10px; color: #888; font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.3s; }
+  .merchant-tab.active { background: linear-gradient(135deg, #ff6b6b 0%, #ff9f4a 100%); color: white; }
+  .merchant-content { flex: 1; padding: 20px; overflow-y: auto; }
+
+  .form-group { margin-bottom: 20px; }
+  .form-label { display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 8px; font-weight: 500; }
+  .form-input { width: 100%; padding: 15px; background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 12px; color: white; font-size: 1rem; font-family: 'Poppins', sans-serif; outline: none; transition: all 0.3s; }
+  .form-input:focus { border-color: #ff6b6b; background: rgba(255, 255, 255, 0.08); }
+  .form-input::placeholder { color: #555; }
+  .form-textarea { min-height: 80px; resize: vertical; }
+
+  .save-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; border: none; border-radius: 15px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 1rem; cursor: pointer; transition: all 0.3s; text-transform: uppercase; letter-spacing: 2px; }
+  .save-btn:active { transform: scale(0.98); }
+
+  .menu-item-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 15px; margin-bottom: 15px; }
+  .menu-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .menu-item-name { font-weight: 700; color: white; font-size: 1rem; }
+  .menu-item-price { color: #ff9f4a; font-weight: 800; font-size: 1.1rem; }
+  .menu-item-desc { color: #666; font-size: 0.85rem; margin-bottom: 10px; }
+  .menu-item-actions { display: flex; gap: 10px; }
+  .btn-small { padding: 8px 15px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; border: none; }
+  .btn-edit { background: rgba(255, 159, 74, 0.2); color: #ff9f4a; }
+  .btn-delete { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+
+  .section-title { font-family: 'Montserrat', sans-serif; font-size: 1.2rem; font-weight: 700; color: white; margin-bottom: 20px; margin-top: 10px; }
+  .empty-state { text-align: center; padding: 40px; color: #666; }
+  .empty-state-icon { font-size: 3rem; margin-bottom: 15px; }
+
+  #map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1; }
+
+  .panel-container { position: absolute; top: 50px; left: 10px; right: 10px; z-index: 1000; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); touch-action: pan-y; }
+  .panel-container.minimized { transform: translateY(calc(-100% + 140px)); }
+  .center-card { background: rgba(0, 0, 0, 0.92); backdrop-filter: blur(25px); border-radius: 25px; padding: 25px 20px 10px 20px; border: 2px solid rgba(255, 107, 107, 0.2); box-shadow: 0 20px 60px rgba(0,0,0,0.8); display: flex; flex-direction: column; }
+
+  .header { text-align: center; margin-bottom: 25px; pointer-events: none; flex-shrink: 0; padding-top: 5px; }
+  .logo { font-family: 'Montserrat', sans-serif; font-size: 2.8rem; font-weight: 900; letter-spacing: 5px; margin-bottom: 10px; background: linear-gradient(135deg, #ff6b6b 0%, #ff9f4a 50%, #ff6b6b 100%); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 40px rgba(255,107,107,0.3); animation: shine 3s ease-in-out infinite; }
+  @keyframes shine { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.2); } }
+  .tagline { font-size: 0.9rem; font-weight: 400; letter-spacing: 2px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tagline .brand-m { color: #ff6b6b; font-weight: 600; }
+  .tagline .brand-e { color: #ff8a5c; font-weight: 600; }
+  .tagline .brand-m2 { color: #ff9f4a; font-weight: 600; }
+  .tagline .brand-a { color: #ff6b6b; font-weight: 600; }
+
+  .content-area { transition: max-height 0.3s ease, opacity 0.3s ease; overflow: hidden; flex: 1; }
+  .panel-container.minimized .content-area { max-height: 0; opacity: 0; pointer-events: none; }
+
+  .swipe-area { width: 100%; padding: 8px 0 5px 0; cursor: grab; touch-action: pan-y; user-select: none; -webkit-user-select: none; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.1); position: relative; }
+  .swipe-area:active { cursor: grabbing; }
+  .menu-btn-in-swipe { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); background: rgba(255, 107, 107, 0.2); border: 1px solid rgba(255, 107, 107, 0.3); color: #ff9f4a; padding: 6px 12px; border-radius: 15px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 0.7rem; cursor: pointer; transition: all 0.3s; z-index: 10; }
+  .menu-btn-in-swipe:active { background: rgba(255, 107, 107, 0.4); transform: translateY(-50%) scale(0.95); }
+  .drag-line { width: 40px; height: 4px; background: rgba(255,255,255,0.3); border-radius: 3px; }
+  .swipe-arrow { font-size: 1.2rem; color: #ff9f4a; animation: bounceArrow 1.5s ease-in-out infinite; }
+  .panel-container.minimized .swipe-arrow { animation: bounceArrowUp 1.5s ease-in-out infinite; }
+  @keyframes bounceArrow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  @keyframes bounceArrowUp { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+  .swipe-hint { font-size: 0.65rem; color: #666; margin-top: 2px; }
+
+  .gps-button { width: 100%; padding: 15px; background: linear-gradient(135deg, #ff6b6b 0%, #ff9f4a 100%); color: white; border: none; border-radius: 20px; font-weight: 800; font-size: 1rem; cursor: pointer; margin-bottom: 15px; box-shadow: 0 10px 30px rgba(255,107,107,0.4); transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 10px; text-transform: uppercase; letter-spacing: 1px; }
+  .gps-button:active { transform: scale(0.98); }
+  .gps-icon { width: 20px; height: 20px; border: 2px solid white; border-radius: 50%; position: relative; animation: pulse 2s infinite; }
+  .gps-icon::after { content: ''; position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.7); } 70% { box-shadow: 0 0 0 10px rgba(255,255,255,0); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); } }
+
+  .filters { display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px; }
+  .filter-row { display: flex; justify-content: space-between; align-items: center; }
+  .filter-label { font-size: 0.85rem; color: #aaa; display: flex; align-items: center; gap: 8px; }
+  .filter-value { color: #ff9f4a; font-weight: 700; font-size: 0.95rem; }
+
+  input[type="range"] { width: 100%; height: 6px; -webkit-appearance: none; background: #333; border-radius: 3px; outline: none; margin-top: 8px; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; background: linear-gradient(135deg, #ff6b6b, #ff9f4a); border-radius: 50%; cursor: pointer; box-shadow: 0 2px 10px rgba(255,107,107,0.5); border: 2px solid white; }
+
+  .search-btn { width: 100%; padding: 18px; background: white; color: #0a0c12; border: none; border-radius: 20px; font-weight: 900; font-size: 1rem; cursor: pointer; margin-bottom: 10px; transition: all 0.3s; text-transform: uppercase; letter-spacing: 1px; }
+  .search-btn:active { transform: scale(0.98); }
+  .status { text-align: center; font-size: 0.8rem; color: #888; min-height: 20px; }
+
+  .info-card { position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 100; background: rgba(0, 0, 0, 0.95); backdrop-filter: blur(25px); border-radius: 25px; padding: 20px; border: 2px solid rgba(255,107,107,0.2); display: none; pointer-events: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
+  .info-card.visible { display: block; animation: slideUp 0.3s ease; }
+  @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .place-name { font-size: 1.2rem; font-weight: 700; margin-bottom: 5px; }
+  .place-price { color: #ff9f4a; font-weight: 700; font-size: 1rem; margin-bottom: 8px; }
+  .place-address { color: #aaa; font-size: 0.85rem; margin-bottom: 15px; }
+  .nav-btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border: none; border-radius: 20px; font-weight: 800; font-size: 1rem; cursor: pointer; }
+  .close-btn { position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: rgba(255,255,255,0.1); border: none; border-radius: 50%; color: white; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+  .custom-marker { min-width: 50px; height: 36px; background: linear-gradient(135deg, #ff6b6b, #ff9f4a); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.85rem; color: white; border: 3px solid white; box-shadow: 0 3px 10px rgba(0,0,0,0.4); padding: 0 10px; white-space: nowrap; }
+  .user-marker { width: 24px; height: 24px; background: #3b82f6; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 4px rgba(59,130,246,0.3); animation: pulseBlue 2s infinite; }
+  @keyframes pulseBlue { 0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.6); } 70% { box-shadow: 0 0 0 12px rgba(59,130,246,0); } 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); } }
+
+  .loader { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+<base target="_blank">
+</head>
+<body>
+
+<!-- INTRO SCREEN -->
+<div id="introScreen">
+  <div class="food-image-container">
+    <img src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=400&fit=crop" alt="Delicious Food" class="food-image">
+    <div class="explosion-container">
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+      <div class="explosion-particle"></div>
+    </div>
+  </div>
+
+  <div class="intro-logo-container">
+    <div class="intro-logo">MEMA</div>
+    <div class="intro-tagline">
+      <span class="brand-m">M</span>ănânci <span class="brand-e">E</span>conomic, <span class="brand-m2">M</span>ănânci <span class="brand-a">A</span>proape
+    </div>
+  </div>
+
+  <div class="intro-buttons">
+    <button class="intro-btn-client" onclick="selectUserType('client')">
+      🍽️ CLIENT
+    </button>
+    <button class="intro-btn-comerciant" onclick="selectUserType('merchant')">
+      🏪 Comerciant
+    </button>
+  </div>
+</div>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen">
+  <div class="auth-container">
+    <div class="auth-title">Autentificare</div>
+    <div class="auth-subtitle">Introdu numărul de telefon</div>
+    <div class="auth-type-badge" id="authTypeBadge">CLIENT</div>
+
+    <div id="phoneStep">
+      <div class="phone-input-container">
+        <span class="phone-prefix">+40</span>
+        <input type="tel" class="phone-input" id="phoneInput" placeholder="7xx xxx xxx" maxlength="9">
+      </div>
+      <div class="auth-error" id="phoneError"></div>
+      <button class="auth-btn" id="sendOtpBtn" onclick="sendOTP()">Trimite cod SMS</button>
+    </div>
+
+    <div id="otpStep" style="display: none;">
+      <div class="auth-subtitle">Introdu codul primit</div>
+      <div class="otp-container">
+        <input type="text" class="otp-input" id="otp1" maxlength="1" oninput="handleOtpInput(this, 1)">
+        <input type="text" class="otp-input" id="otp2" maxlength="1" oninput="handleOtpInput(this, 2)">
+        <input type="text" class="otp-input" id="otp3" maxlength="1" oninput="handleOtpInput(this, 3)">
+        <input type="text" class="otp-input" id="otp4" maxlength="1" oninput="handleOtpInput(this, 4)">
+        <input type="text" class="otp-input" id="otp5" maxlength="1" oninput="handleOtpInput(this, 5)">
+        <input type="text" class="otp-input" id="otp6" maxlength="1" oninput="handleOtpInput(this, 6)">
+      </div>
+      <div class="auth-error" id="otpError"></div>
+      <button class="auth-btn" id="verifyOtpBtn" onclick="verifyOTP()">Verifică codul</button>
+      <button class="auth-back-btn" onclick="backToPhone()">← Înapoi</button>
+    </div>
+
+    <button class="auth-back-btn" id="backToIntroBtn" onclick="backToIntroFromAuth()">← Înapoi la meniu</button>
+  </div>
+</div>
+
+<!-- MERCHANT DASHBOARD -->
+<div id="merchantDashboard">
+  <div class="merchant-header">
+    <div class="merchant-header-top">
+      <div class="merchant-title">Dashboard Comerciant</div>
+      <button class="merchant-logout" onclick="logout()">Ieșire</button>
+    </div>
+    <div class="merchant-tabs">
+      <button class="merchant-tab active" onclick="switchTab('location')" id="tabLocation">Localul meu</button>
+      <button class="merchant-tab" onclick="switchTab('menu')" id="tabMenu">Meniu</button>
+    </div>
+  </div>
+
+  <div class="merchant-content" id="merchantContent">
+    <div id="locationForm">
+      <div class="section-title">Informații local</div>
+      <div class="form-group">
+        <label class="form-label">Numele localului *</label>
+        <input type="text" class="form-input" id="locName" placeholder="ex: Restaurantul București">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Adresa completă *</label>
+        <input type="text" class="form-input" id="locAddress" placeholder="ex: Strada Victoriei nr. 10, București">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Telefon local</label>
+        <input type="tel" class="form-input" id="locPhone" placeholder="ex: 0722 123 456">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descriere</label>
+        <textarea class="form-input form-textarea" id="locDesc" placeholder="Descrie-ți localul în câteva cuvinte..."></textarea>
+      </div>
+      <button class="save-btn" onclick="saveLocation()">💾 Salvează localul</button>
+    </div>
+
+    <div id="menuForm" style="display: none;">
+      <div class="section-title">Adaugă produs în meniu</div>
+      <div class="form-group">
+        <label class="form-label">Numele produsului *</label>
+        <input type="text" class="form-input" id="itemName" placeholder="ex: Shaorma mică">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Preț (lei) *</label>
+        <input type="number" class="form-input" id="itemPrice" placeholder="ex: 25" min="1" step="0.5">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Categorie</label>
+        <select class="form-input" id="itemCategory" style="cursor: pointer;">
+          <option value="mancare">Mâncare</option>
+          <option value="bautura">Băutură</option>
+          <option value="desert">Desert</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descriere (opțional)</label>
+        <input type="text" class="form-input" id="itemDesc" placeholder="ex: Carne de pui, cartofi, salată, sosuri">
+      </div>
+      <button class="save-btn" onclick="addMenuItem()">➕ Adaugă în meniu</button>
+
+      <div class="section-title" style="margin-top: 30px;">Produse existente</div>
+      <div id="menuItemsList">
+        <div class="empty-state">
+          <div class="empty-state-icon">📝</div>
+          <div>Niciun produs adăugat încă</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP CLIENT -->
+<div id="map"></div>
+
+<div class="panel-container" id="panelContainer">
+  <div class="center-card">
+    <div class="header">
+      <div class="logo">MEMA</div>
+      <div class="tagline">
+        <span class="brand-m">M</span>ănânci <span class="brand-e">E</span>conomic, <span class="brand-m2">M</span>ănânci <span class="brand-a">A</span>proape
+      </div>
+    </div>
+
+    <div class="content-area" id="contentArea">
+      <button class="gps-button" onclick="getLocation()">
+        <div class="gps-icon"></div>
+        LOCALIZEAZĂ-MĂ
+      </button>
+
+      <div class="filters">
+        <div>
+          <div class="filter-row">
+            <span class="filter-label">📍 Raza de căutare</span>
+            <span class="filter-value" id="radiusValue">1000 m</span>
+          </div>
+          <input type="range" id="radiusSlider" min="10" max="5000" step="10" value="1000">
+        </div>
+
+        <div>
+          <div class="filter-row">
+            <span class="filter-label">💰 Buget maxim</span>
+            <span class="filter-value" id="budgetValue">50 lei</span>
+          </div>
+          <input type="range" id="budgetSlider" min="10" max="1000" step="10" value="50">
+        </div>
+      </div>
+
+      <button class="search-btn" onclick="searchPlaces()">🔍 CAUTĂ LOCURI</button>
+
+      <div class="status" id="status">Apasă LOCALIZEAZĂ-MĂ pentru a începe</div>
+    </div>
+
+    <div class="swipe-area" id="swipeArea">
+      <button class="menu-btn-in-swipe" onclick="logout()">← Meniu</button>
+      <div class="drag-line"></div>
+      <div class="swipe-arrow" id="swipeArrow">⇡</div>
+      <div class="swipe-hint" id="swipeHint">Swipe în sus pentru a minimiza</div>
+    </div>
+  </div>
+</div>
+
+<div id="infoCard" class="info-card">
+  <button class="close-btn" onclick="closeCard()">×</button>
+  <div id="placeName" class="place-name"></div>
+  <div id="placePrice" class="place-price"></div>
+  <div id="placeAddress" class="place-address"></div>
+  <button class="nav-btn" onclick="navigate()">🧭 Navigare Google Maps</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ============================================
+// 1. SUPABASE CONFIG (FĂRĂ CONFLICTE)
+// ============================================
+const SUPABASE_URL = 'https://dkxafoncrgtuzwhahop.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_gPa30OH3NpVyNAT0BGjCLw_ETcX2-jf';
+let supabaseClient = null;
+
+function initSupabase() {
+  if (SUPABASE_URL.includes('YOUR_PROJECT')) {
+    console.log('⚠️ Configurează SUPABASE_URL și SUPABASE_ANON_KEY în cod');
+    return false;
+  }
+  try {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('✅ Supabase conectat');
+    return true;
+  } catch(e) {
+    console.error('❌ Eroare Supabase:', e);
+    return false;
+  }
+}
+
+// ============================================
+// 2. VARIABILE GLOBALE
+// ============================================
+let currentUser = null;
+let currentUserType = null;
+let userLocation = null;
+let map;
+let userMarker;
+let radiusCircle;
+let placeMarkers = [];
+let currentLat = null;
+let currentLng = null;
+let selectedPlace = null;
+let isMinimized = false;
+let touchStartY = 0;
+let touchEndY = 0;
+let isDragging = false;
+let tempOtpCode = null;
+
+const els = {
+  introScreen: document.getElementById('introScreen'),
+  authScreen: document.getElementById('authScreen'),
+  merchantDashboard: document.getElementById('merchantDashboard'),
+  panelContainer: document.getElementById('panelContainer'),
+  contentArea: document.getElementById('contentArea'),
+  swipeArea: document.getElementById('swipeArea'),
+  swipeArrow: document.getElementById('swipeArrow'),
+  swipeHint: document.getElementById('swipeHint'),
+  radiusSlider: document.getElementById('radiusSlider'),
+  radiusValue: document.getElementById('radiusValue'),
+  budgetSlider: document.getElementById('budgetSlider'),
+  budgetValue: document.getElementById('budgetValue'),
+  status: document.getElementById('status'),
+  infoCard: document.getElementById('infoCard'),
+  placeName: document.getElementById('placeName'),
+  placePrice: document.getElementById('placePrice'),
+  placeAddress: document.getElementById('placeAddress'),
+  authTypeBadge: document.getElementById('authTypeBadge'),
+  phoneStep: document.getElementById('phoneStep'),
+  otpStep: document.getElementById('otpStep'),
+  phoneInput: document.getElementById('phoneInput'),
+  phoneError: document.getElementById('phoneError'),
+  otpError: document.getElementById('otpError'),
+  sendOtpBtn: document.getElementById('sendOtpBtn'),
+  verifyOtpBtn: document.getElementById('verifyOtpBtn'),
+  locationForm: document.getElementById('locationForm'),
+  menuForm: document.getElementById('menuForm'),
+  menuItemsList: document.getElementById('menuItemsList')
+};
+
+// ============================================
+// 3. FUNCȚII GLOBALE - TOATE DEFINITE AICI
+// ============================================
+
+// ----- NAVIGARE & AUTH -----
+function selectUserType(type) {
+  currentUserType = type;
+  els.introScreen.classList.add('hidden');
+  els.authScreen.classList.add('visible');
+
+  if (type === 'merchant') {
+    els.authTypeBadge.textContent = 'COMERCIANT';
+    els.authTypeBadge.className = 'auth-type-badge merchant';
+  } else {
+    els.authTypeBadge.textContent = 'CLIENT';
+    els.authTypeBadge.className = 'auth-type-badge client';
+  }
+
+  setTimeout(() => els.phoneInput.focus(), 100);
+}
+
+function backToIntroFromAuth() {
+  els.authScreen.classList.remove('visible');
+  els.introScreen.classList.remove('hidden');
+  resetAuthForm();
+}
+
+function resetAuthForm() {
+  els.phoneStep.style.display = 'block';
+  els.otpStep.style.display = 'none';
+  els.phoneInput.value = '';
+  els.phoneError.textContent = '';
+  els.otpError.textContent = '';
+  for (let i = 1; i <= 6; i++) {
+    document.getElementById('otp' + i).value = '';
+  }
+}
+
+function sendOTP() {
+  const phone = els.phoneInput.value.trim();
+
+  if (!phone || phone.length < 9) {
+    els.phoneError.textContent = 'Introdu un număr valid de 9 cifre';
+    return;
+  }
+
+  if (!/^[7][0-9]{8}$/.test(phone)) {
+    els.phoneError.textContent = 'Număr invalid. Ex: 7xx xxx xxx';
+    return;
+  }
+
+  els.phoneError.textContent = '';
+  els.sendOtpBtn.disabled = true;
+  els.sendOtpBtn.textContent = 'Se trimite...';
+
+  setTimeout(() => {
+    tempOtpCode = '123456';
+    console.log('📱 Cod OTP (simulat):', tempOtpCode);
+
+    els.phoneStep.style.display = 'none';
+    els.otpStep.style.display = 'block';
+    els.sendOtpBtn.disabled = false;
+    els.sendOtpBtn.textContent = 'Trimite cod SMS';
+
+    document.getElementById('otp1').focus();
+
+    alert('🔔 Pentru testare, codul OTP este: 123456');
+  }, 1500);
+}
+
+function handleOtpInput(input, index) {
+  if (input.value.length === 1 && index < 6) {
+    document.getElementById('otp' + (index + 1)).focus();
+  }
+
+  const allFilled = Array.from({length: 6}, (_, i) => 
+    document.getElementById('otp' + (i + 1)).value
+  ).every(v => v.length === 1);
+
+  if (allFilled) {
+    verifyOTP();
+  }
+}
+
+function backToPhone() {
+  els.otpStep.style.display = 'none';
+  els.phoneStep.style.display = 'block';
+  els.otpError.textContent = '';
+}
+
+function verifyOTP() {
+  const otp = Array.from({length: 6}, (_, i) => 
+    document.getElementById('otp' + (i + 1)).value
+  ).join('');
+
+  if (otp.length !== 6) {
+    els.otpError.textContent = 'Introdu toate cele 6 cifre';
+    return;
+  }
+
+  if (otp === tempOtpCode || otp === '123456') {
+    completeAuth();
+  } else {
+    els.otpError.textContent = 'Cod incorect. Încearcă din nou.';
+  }
+}
+
+function completeAuth() {
+  const phone = '+40' + els.phoneInput.value.trim();
+
+  currentUser = {
+    id: 'user_' + Date.now(),
+    phone: phone,
+    type: currentUserType,
+    created_at: new Date().toISOString()
+  };
+
+  console.log('✅ Autentificare reușită:', currentUser);
+
+  if (currentUserType === 'merchant') {
+    els.authScreen.classList.remove('visible');
+    els.merchantDashboard.classList.add('visible');
+    loadMerchantData();
+  } else {
+    els.authScreen.classList.remove('visible');
+    initClientApp();
+  }
+}
+
+function logout() {
+  currentUser = null;
+  currentUserType = null;
+
+  els.merchantDashboard.classList.remove('visible');
+  if (map) {
+    map.remove();
+    map = null;
+  }
+  userMarker = null;
+  radiusCircle = null;
+  placeMarkers = [];
+  currentLat = null;
+  currentLng = null;
+  isMinimized = false;
+  els.panelContainer.classList.remove('minimized');
+  els.swipeArrow.textContent = '⇡';
+  els.swipeHint.textContent = 'Swipe în sus pentru a minimiza';
+
+  resetAuthForm();
+  backToIntroFromAuth();
+}
+
+// ----- MERCHANT DASHBOARD -----
+function switchTab(tab) {
+  document.querySelectorAll('.merchant-tab').forEach(t => t.classList.remove('active'));
+
+  if (tab === 'location') {
+    document.getElementById('tabLocation').classList.add('active');
+    els.locationForm.style.display = 'block';
+    els.menuForm.style.display = 'none';
+  } else {
+    document.getElementById('tabMenu').classList.add('active');
+    els.locationForm.style.display = 'none';
+    els.menuForm.style.display = 'block';
+    loadMenuItems();
+  }
+}
+
+function loadMerchantData() {
+  console.log('Încărcare date comerciant pentru:', currentUser.phone);
+}
+
+function saveLocation() {
+  const name = document.getElementById('locName').value.trim();
+  const address = document.getElementById('locAddress').value.trim();
+  const phone = document.getElementById('locPhone').value.trim();
+  const desc = document.getElementById('locDesc').value.trim();
+
+  if (!name || !address) {
+    alert('Completează numele și adresa localului!');
+    return;
+  }
+
+  const location = {
+    id: 'loc_' + Date.now(),
+    merchant_id: currentUser.id,
+    name,
+    address,
+    phone,
+    description: desc,
+    lat: null,
+    lng: null,
+    created_at: new Date().toISOString()
+  };
+
+  console.log('💾 Local salvat:', location);
+  alert('✅ Local salvat cu succes!');
+}
+
+function addMenuItem() {
+  const name = document.getElementById('itemName').value.trim();
+  const price = parseFloat(document.getElementById('itemPrice').value);
+  const category = document.getElementById('itemCategory').value;
+  const desc = document.getElementById('itemDesc').value.trim();
+
+  if (!name || !price) {
+    alert('Completează numele și prețul!');
+    return;
+  }
+
+  const item = {
+    id: 'item_' + Date.now(),
+    name,
+    price,
+    category,
+    description: desc,
+    created_at: new Date().toISOString()
+  };
+
+  addItemToList(item);
+
+  document.getElementById('itemName').value = '';
+  document.getElementById('itemPrice').value = '';
+  document.getElementById('itemDesc').value = '';
+
+  console.log('🍽️ Produs adăugat:', item);
+}
+
+function addItemToList(item) {
+  const emptyState = els.menuItemsList.querySelector('.empty-state');
+  if (emptyState) emptyState.remove();
+
+  const itemCard = document.createElement('div');
+  itemCard.className = 'menu-item-card';
+  itemCard.innerHTML = `
+    <div class="menu-item-header">
+      <span class="menu-item-name">${item.name}</span>
+      <span class="menu-item-price">${item.price} lei</span>
+    </div>
+    ${item.description ? `<div class="menu-item-desc">${item.description}</div>` : ''}
+    <div class="menu-item-actions">
+      <button class="btn-small btn-edit" onclick="editItem('${item.id}')">✏️ Editează</button>
+      <button class="btn-small btn-delete" onclick="deleteItem('${item.id}')">🗑️ Șterge</button>
+    </div>
+  `;
+
+  els.menuItemsList.insertBefore(itemCard, els.menuItemsList.firstChild);
+}
+
+function loadMenuItems() {
+  console.log('Încărcare meniu...');
+}
+
+function editItem(id) {
+  console.log('Editare item:', id);
+}
+
+function deleteItem(id) {
+  if (confirm('Sigur vrei să ștergi acest produs?')) {
+    console.log('Ștergere item:', id);
+  }
+}
+
+// ----- CLIENT APP -----
+function initClientApp() {
+  els.introScreen.classList.add('hidden');
+  initMap();
+}
+
+function initMap() {
+  if (map) return;
+
+  map = L.map('map', {zoomControl: false}).setView([44.4325, 26.1038], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: ''
+  }).addTo(map);
+
+  L.control.zoom({position: 'bottomright'}).addTo(map);
+
+  els.radiusSlider.addEventListener('input', function() {
+    els.radiusValue.textContent = this.value + ' m';
+    if (currentLat) updateCircle(parseInt(this.value));
+  });
+
+  els.budgetSlider.addEventListener('input', function() {
+    els.budgetValue.textContent = this.value + ' lei';
+  });
+
+  map.on('click', () => {
+    els.infoCard.classList.remove('visible');
+  });
+}
+
+function getLocation() {
+  if (!navigator.geolocation) {
+    els.status.innerHTML = '❌ GPS indisponibil';
+    return;
+  }
+
+  els.status.innerHTML = '<span class="loader"></span> Se obține locația...';
+
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      currentLat = pos.coords.latitude;
+      currentLng = pos.coords.longitude;
+
+      map.setView([currentLat, currentLng], 16);
+
+      if (userMarker) map.removeLayer(userMarker);
+      const icon = L.divIcon({
+        html: '<div class="user-marker"></div>',
+        className: '',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+      userMarker = L.marker([currentLat, currentLng], {icon: icon, zIndexOffset: 1000}).addTo(map);
+
+      updateCircle(parseInt(els.radiusSlider.value));
+      els.status.innerHTML = '✅ Locație obținută! Apasă CAUTĂ LOCURI';
+    },
+    function(err) {
+      console.error(err);
+      els.status.innerHTML = '❌ GPS indisponibil. Verifică permisiunile.';
+    },
+    {enableHighAccuracy: true, timeout: 10000, maximumAge: 0}
+  );
+}
+
+function updateCircle(radius) {
+  if (radiusCircle) map.removeLayer(radiusCircle);
+
+  radiusCircle = L.circle([currentLat, currentLng], {
+    radius: radius,
+    color: '#ff6b6b',
+    weight: 2,
+    fillColor: '#ff6b6b',
+    fillOpacity: 0.1,
+    dashArray: '5,5'
+  }).addTo(map);
+
+  map.fitBounds(radiusCircle.getBounds(), {padding: [50,50]});
+}
+
+async function searchPlaces() {
+  if (!currentLat) {
+    els.status.innerHTML = '⚠️ Apasă mai întâi LOCALIZEAZĂ-MĂ';
+    return;
+  }
+
+  const radius = parseInt(els.radiusSlider.value);
+  const budget = parseInt(els.budgetSlider.value);
+
+  els.status.innerHTML = '<span class="loader"></span> Se caută...';
+
+  placeMarkers.forEach(m => map.removeLayer(m));
+  placeMarkers = [];
+
+  try {
+    const radiusDeg = radius / 111000;
+    const query = `[out:json][timeout:25];
+(
+  node["amenity"~"restaurant|fast_food|cafe|pub|bar"](${currentLat - radiusDeg},${currentLng - radiusDeg},${currentLat + radiusDeg},${currentLng + radiusDeg});
+  way["amenity"~"restaurant|fast_food|cafe|pub|bar"](${currentLat - radiusDeg},${currentLng - radiusDeg},${currentLat + radiusDeg},${currentLng + radiusDeg});
+);
+out body center;`;
+
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: query,
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+    });
+
+    const data = await response.json();
+    const places = [];
+    const seen = new Set();
+
+    for (const el of data.elements) {
+      let lat, lng;
+      if (el.type === 'node') {
+        lat = el.lat; lng = el.lon;
+      } else if (el.center) {
+        lat = el.center.lat; lng = el.center.lon;
+      } else continue;
+
+      const dist = getDistance(currentLat, currentLng, lat, lng);
+      if (dist > radius) continue;
+
+      const amenity = el.tags?.amenity || 'restaurant';
+      const price = getEstimatedPrice(amenity);
+      if (price > budget) continue;
+
+      const name = el.tags?.name || defaultName(amenity);
+      const address = el.tags?.['addr:street'] ? 
+        `${el.tags['addr:street']} ${el.tags['addr:housenumber'] || ''}` : 
+        `${Math.round(dist)}m`;
+
+      const id = el.type + '_' + el.id;
+      if (seen.has(id)) continue;
+      seen.add(id);
+
+      places.push({lat, lng, name, amenity, price, dist, address});
+    }
+
+    places.sort((a,b) => a.dist - b.dist);
+
+    places.forEach((p, i) => {
+      const icon = L.divIcon({
+        html: `<div class="custom-marker">${p.price} lei</div>`,
+        className: '',
+        iconSize: [50, 36],
+        iconAnchor: [25, 36]
+      });
+
+      const marker = L.marker([p.lat, p.lng], {icon}).addTo(map);
+
+      marker.on('click', () => {
+        selectedPlace = p;
+        els.placeName.textContent = getIcon(p.amenity) + ' ' + p.name;
+        els.placePrice.textContent = `~${p.price} lei · ${getPriceLabel(p.price)}`;
+        els.placeAddress.textContent = p.address + ' · ' + Math.round(p.dist) + 'm';
+        els.infoCard.classList.add('visible');
+      });
+
+      placeMarkers.push(marker);
+    });
+
+    const cheap = places.filter(p => p.price <= 35).length;
+    els.status.innerHTML = `✅ ${places.length} locuri (${cheap} ieftine)`;
+
+  } catch(e) {
+    console.error(e);
+    els.status.innerHTML = '❌ Eroare. Încearcă din nou.';
+  }
+}
+
+function getDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2-lat1) * Math.PI / 180;
+  const Δλ = (lng2-lng1) * Math.PI / 180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function getEstimatedPrice(amenity) {
+  const prices = {fast_food: 30, cafe: 25, pub: 50, bar: 50, restaurant: 80};
+  return prices[amenity] || 50;
+}
+
+function defaultName(amenity) {
+  const names = {fast_food: 'Fast Food', cafe: 'Cafenea', pub: 'Pub', bar: 'Bar', restaurant: 'Restaurant'};
+  return names[amenity] || 'Locație';
+}
+
+function getIcon(amenity) {
+  const icons = {fast_food: '🍔', cafe: '☕', pub: '🍺', bar: '🍸', restaurant: '🍽️'};
+  return icons[amenity] || '📍';
+}
+
+function getPriceLabel(price) {
+  if (price <= 25) return '🟢 Ieftin';
+  if (price <= 50) return '🟡 Mediu';
+  return '🔴 Premium';
+}
+
+function navigate() {
+  if (!selectedPlace) return;
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${selectedPlace.lat},${selectedPlace.lng}&travelmode=walking`;
+  window.open(url, '_blank');
+}
+
+function closeCard() {
+  els.infoCard.classList.remove('visible');
+}
+
+// ----- SWIPE HANDLING -----
+function handleSwipe() {
+  const swipeThreshold = 50;
+  const diff = touchStartY - touchEndY;
+
+  if (Math.abs(diff) > swipeThreshold) {
+    if (diff > 0 && !isMinimized) {
+      minimizePanel();
+    } else if (diff < 0 && isMinimized) {
+      expandPanel();
+    }
+  }
+}
+
+function minimizePanel() {
+  isMinimized = true;
+  els.panelContainer.classList.add('minimized');
+  els.swipeArrow.textContent = '⇣';
+  els.swipeHint.textContent = 'Swipe în jos pentru a deschide';
+}
+
+function expandPanel() {
+  isMinimized = false;
+  els.panelContainer.classList.remove('minimized');
+  els.swipeArrow.textContent = '⇡';
+  els.swipeHint.textContent = 'Swipe în sus pentru a minimiza';
+}
+
+function handleTouchStart(e) {
+  if (e.target.classList.contains('menu-btn-in-swipe')) return;
+  touchStartY = e.changedTouches[0].screenY;
+  isDragging = true;
+}
+
+function handleMouseDown(e) {
+  if (e.target.classList.contains('menu-btn-in-swipe')) return;
+  touchStartY = e.screenY;
+  isDragging = true;
+  e.preventDefault();
+}
+
+function handleTouchMove(e) {
+  if (!isDragging) return;
+  touchEndY = e.changedTouches[0].screenY;
+}
+
+function handleMouseMove(e) {
+  if (!isDragging) return;
+  touchEndY = e.screenY;
+}
+
+function handleTouchEnd(e) {
+  if (!isDragging) return;
+  isDragging = false;
+  handleSwipe();
+}
+
+function handleMouseUp(e) {
+  if (!isDragging) return;
+  isDragging = false;
+  handleSwipe();
+}
+
+// ============================================
+// 4. EVENT LISTENERS
+// ============================================
+els.swipeArea.addEventListener('touchstart', handleTouchStart, {passive: true});
+els.swipeArea.addEventListener('touchmove', handleTouchMove, {passive: true});
+els.swipeArea.addEventListener('touchend', handleTouchEnd, {passive: true});
+els.swipeArea.addEventListener('mousedown', handleMouseDown);
+document.addEventListener('mousemove', handleMouseMove);
+document.addEventListener('mouseup', handleMouseUp);
+
+// ============================================
+// 5. INIȚIALIZARE
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+  initSupabase();
+  console.log('🚀 MEMA initialized');
+});
+</script>
+</body>
+</html>
