@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>MEMA v4.1 - Fix Auth & Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif; background: #0a0c12; color: #fff; overflow: hidden; height: 100vh; position: fixed; width: 100%; }
+#introScreen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #1a1c24 0%, #0a0c12 100%); z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 20px; transition: opacity 0.5s ease, visibility 0.5s ease; }
+#introScreen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.food-image-container { position: relative; width: 220px; height: 220px; margin-bottom: 25px; overflow: visible; pointer-events: none; }
+.food-image { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; box-shadow: 0 20px 60px rgba(255, 107, 107, 0.6); border: 5px solid rgba(255, 255, 255, 0.2); animation: foodExplode 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards; }
+@keyframes foodExplode { 0% { transform: scale(0) rotate(-180deg); opacity: 0; } 60% { transform: scale(1.4) rotate(10deg); filter: brightness(1.3); } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+.explosion-container { position: absolute; top: 50%; left: 50%; width: 220px; height: 220px; transform: translate(-50%, -50%); pointer-events: none; overflow: hidden; border-radius: 50%; }
+.explosion-particle { position: absolute; width: 8px; height: 8px; border-radius: 50%; top: 50%; left: 50%; opacity: 0; animation: particleFly 1.8s ease-out forwards; }
+.explosion-particle:nth-child(1) { background: #e8b89a; animation-delay: 0.1s; --tx: 120px; --ty: -80px; }
+.explosion-particle:nth-child(2) { background: #e07050; animation-delay: 0.15s; --tx: -100px; --ty: -120px; }
+.explosion-particle:nth-child(3) { background: #e8d080; animation-delay: 0.2s; --tx: 80px; --ty: 100px; }
+.explosion-particle:nth-child(4) { background: #5ec49a; animation-delay: 0.25s; --tx: -120px; --ty: 60px; }
+.explosion-particle:nth-child(5) { background: #7ec4b8; animation-delay: 0.3s; --tx: 140px; --ty: 20px; }
+.explosion-particle:nth-child(6) { background: #c494a0; animation-delay: 0.35s; --tx: -60px; --ty: 140px; }
+.explosion-particle:nth-child(7) { background: #a65a53; animation-delay: 0.4s; --tx: 40px; --ty: -140px; }
+.explosion-particle:nth-child(8) { background: #d8b060; animation-delay: 0.45s; --tx: -140px; --ty: -40px; }
+.explosion-particle:nth-child(9) { background: #e8b89a; animation-delay: 0.5s; --tx: 100px; --ty: 80px; }
+.explosion-particle:nth-child(10) { background: #e07050; animation-delay: 0.55s; --tx: -80px; --ty: -100px; }
+.explosion-particle:nth-child(11) { background: #e8d080; animation-delay: 0.6s; --tx: 160px; --ty: -20px; }
+.explosion-particle:nth-child(12) { background: #5ec49a; animation-delay: 0.65s; --tx: -160px; --ty: 20px; }
+.explosion-particle:nth-child(13) { background: #7ec4b8; animation-delay: 0.7s; --tx: 20px; --ty: 160px; }
+.explosion-particle:nth-child(14) { background: #c494a0; animation-delay: 0.75s; --tx: -20px; --ty: -160px; }
+.explosion-particle:nth-child(15) { background: #e8b89a; animation-delay: 0.8s; --tx: 60px; --ty: -60px; }
+.explosion-particle:nth-child(16) { background: #e8d080; animation-delay: 0.85s; --tx: -60px; --ty: 60px; }
+@keyframes particleFly { 0% { transform: translate(-50%, -50%) scale(0); opacity: 1; } 50% { opacity: 1; } 100% { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0); opacity: 0; } }
+.intro-logo-container { text-align: center; opacity: 0; animation: fadeInUp 0.8s ease forwards; animation-delay: 1.2s; margin-bottom: 20px; }
+.intro-logo { font-family: 'Montserrat', sans-serif; font-size: 3.5rem; font-weight: 900; letter-spacing: 6px; background: linear-gradient(135deg, #e8b89a 0%, #e07050 50%, #e8b89a 100%); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 60px rgba(255,107,107,0.5); margin-bottom: 10px; }
+.intro-tagline { font-size: 0.95rem; color: #aaa; letter-spacing: 2px; }
+.intro-tagline .brand-m { color: #e8b89a; font-weight: 600; }
+.intro-tagline .brand-e { color: #d4a080; font-weight: 600; }
+.intro-tagline .brand-m2 { color: #e07050; font-weight: 600; }
+.intro-tagline .brand-a { color: #e8b89a; font-weight: 600; }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+.intro-buttons { display: flex; flex-direction: column; align-items: center; gap: 20px; width: 85%; max-width: 320px; opacity: 0; animation: fadeInUp 0.8s ease forwards; animation-delay: 1.6s; margin-top: 0px; pointer-events: auto; }
+.intro-btn-client { width: 100%; padding: 22px 40px; background: linear-gradient(135deg, #e8b89a 0%, #d4a080 50%, #e07050 100%); color: white; border: none; border-radius: 30px; font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 1.4rem; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 4px; box-shadow: 0 15px 40px rgba(255,107,107,0.5); }
+.intro-btn-client:active { transform: scale(0.95); box-shadow: 0 10px 30px rgba(255,107,107,0.4); }
+.intro-btn-comerciant { width: 100%; padding: 22px 40px; background: linear-gradient(135deg, #a8e6cf 0%, #7fcdcd 50%, #a8e6cf 100%); color: #1a3c2a; border: none; border-radius: 30px; font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 1.4rem; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 4px; box-shadow: 0 15px 40px rgba(124,205,180,0.5); }
+.intro-btn-comerciant:active { transform: scale(0.95); box-shadow: 0 10px 30px rgba(124,205,180,0.4); }
+#authScreen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #1a1c24 0%, #0a0c12 100%); z-index: 9998; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+#authScreen.visible { display: flex; }
+.auth-container { width: 100%; max-width: 350px; text-align: center; }
+.auth-title { font-family: 'Montserrat', sans-serif; font-size: 1.8rem; font-weight: 800; margin-bottom: 10px; color: white; }
+.auth-subtitle { color: #888; font-size: 0.9rem; margin-bottom: 30px; }
+.auth-type-badge { display: inline-block; padding: 8px 20px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 30px; }
+.auth-type-badge.merchant { background: rgba(107, 114, 128, 0.3); color: #9ca3af; border: 2px solid #4b5563; }
+.auth-type-badge.client { background: rgba(255, 107, 107, 0.2); color: #e07050; border: 2px solid rgba(255, 107, 107, 0.4); }
+.phone-input-container { position: relative; margin-bottom: 20px; }
+.phone-prefix { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #888; font-size: 1rem; font-weight: 600; }
+.phone-input { width: 100%; padding: 18px 18px 18px 55px; background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 15px; color: white; font-size: 1.1rem; font-family: 'Poppins', sans-serif; outline: none; transition: all 0.3s; }
+.phone-input:focus { border-color: #e8b89a; background: rgba(255, 255, 255, 0.08); }
+.phone-input::placeholder { color: #555; }
+.otp-container { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+.otp-input { width: 50px; height: 60px; background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 15px; color: white; font-size: 1.5rem; text-align: center; font-family: 'Poppins', sans-serif; outline: none; transition: all 0.3s; }
+.otp-input:focus { border-color: #e8b89a; background: rgba(255, 255, 255, 0.08); }
+.auth-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, #e8b89a 0%, #e07050 100%); color: white; border: none; border-radius: 15px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 1rem; cursor: pointer; transition: all 0.3s; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; }
+.auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.auth-btn:active:not(:disabled) { transform: scale(0.98); }
+.auth-back-btn { background: transparent; border: none; color: #666; font-size: 0.9rem; cursor: pointer; padding: 10px; }
+.auth-back-btn:active { color: #888; }
+.auth-error { color: #e8b89a; font-size: 0.85rem; margin-bottom: 15px; min-height: 20px; }
+.auth-info { color: #6ec4a0; font-size: 0.8rem; margin-bottom: 15px; min-height: 20px; }
+
+#merchantDashboard { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0a0c12; z-index: 9997; display: none; flex-direction: column; overflow-y: auto; }
+#merchantDashboard.visible { display: flex; }
+.merchant-header { background: linear-gradient(135deg, #1a1c24 0%, #0a0c12 100%); padding: 20px; border-bottom: 1px solid rgba(255, 107, 107, 0.2); position: sticky; top: 0;  }
+.merchant-header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.merchant-title { font-family: 'Montserrat', sans-serif; font-size: 1.5rem; font-weight: 800; color: white; }
+.merchant-logout { background: rgba(255, 107, 107, 0.2); border: 1px solid rgba(255, 107, 107, 0.3); color: #e07050; padding: 8px 15px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
+.merchant-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; }
+.merchant-tab { flex: 1; padding: 12px 8px; background: rgba(255, 255, 255, 0.05); border: none; border-radius: 10px; color: #888; font-family: 'Poppins', sans-serif; font-weight: 600; font-size: 0.8rem; cursor: pointer; transition: all 0.3s; white-space: nowrap; min-width: 80px; }
+.merchant-tab.active { background: linear-gradient(135deg, #e8b89a 0%, #e07050 100%); color: white; }
+.merchant-content { flex: 1; padding: 20px; overflow-y: auto; padding-bottom: 100px; }
+
+.form-group { margin-bottom: 20px; }
+.form-label { display: block; color: #aaa; font-size: 0.85rem; margin-bottom: 8px; font-weight: 500; }
+.form-input { width: 100%; padding: 15px; background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.1); border-radius: 12px; color: white; font-size: 1rem; font-family: 'Poppins', sans-serif; outline: none; transition: all 0.3s; }
+.form-input:focus { border-color: #e8b89a; background: rgba(255, 255, 255, 0.08); }
+.form-input::placeholder { color: #555; }
+.form-textarea { min-height: 80px; resize: vertical; }
+.form-select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23888'%3E%3Cpath d='M6 9L1 4h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 15px center; padding-right: 40px; }
+.save-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, #5ec49a 0%, #4eb488 100%); color: white; border: none; border-radius: 15px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 1rem; cursor: pointer; transition: all 0.3s; text-transform: uppercase; letter-spacing: 2px; }
+.save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.save-btn:active:not(:disabled) { transform: scale(0.98); }
+
+.menu-item-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 15px; margin-bottom: 15px; }
+.menu-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.menu-item-name { font-weight: 700; color: white; font-size: 1rem; }
+.menu-item-price { color: #e07050; font-weight: 800; font-size: 1.1rem; }
+.menu-item-desc { color: #666; font-size: 0.85rem; margin-bottom: 10px; }
+.menu-item-actions { display: flex; gap: 10px; }
+.btn-small { padding: 8px 15px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; border: none; }
+.btn-edit { background: rgba(255, 159, 74, 0.2); color: #e07050; }
+.btn-delete { background: rgba(239, 68, 68, 0.2); color: #e07050; }
+
+.section-title { font-family: 'Montserrat', sans-serif; font-size: 1.2rem; font-weight: 700; color: white; margin-bottom: 20px; margin-top: 10px; }
+.empty-state { text-align: center; padding: 40px; color: #666; }
+.empty-state-icon { font-size: 3rem; margin-bottom: 15px; }
+
+.offer-status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-left: 8px; }
+.status-active { background: rgba(34, 197, 94, 0.2); color: #6ec4a0; border: 1px solid rgba(34,197,94,0.3); }
+.status-scheduled { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+.status-draft { background: rgba(107, 114, 128, 0.2); color: #9ca3af; border: 1px solid rgba(107,114,128,0.3); }
+.status-expired { background: rgba(239, 68, 68, 0.2); color: #d4a080; border: 1px solid rgba(239,68,68,0.3); }
+
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 25px; }
+.stat-box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 18px; text-align: center; }
+.stat-value { font-size: 1.8rem; font-weight: 800; color: #e07050; font-family: 'Montserrat', sans-serif; }
+.stat-label { color: #888; font-size: 0.75rem; margin-top: 5px; text-transform: uppercase; letter-spacing: 1px; }
+
+.info-box { background: rgba(59, 130, 246, 0.1); border-left: 3px solid #7ec4b8; padding: 12px; margin: 15px 0; border-radius: 0 8px 8px 0; font-size: 0.8rem; color: #93c5fd; line-height: 1.5; }
+.dual-input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.offer-item-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 15px; padding: 18px; margin-bottom: 15px; transition: all 0.3s; }
+.offer-item-card:active { background: rgba(255,255,255,0.05); }
+.offer-item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.offer-item-title { font-weight: 700; color: white; font-size: 1rem; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.offer-item-desc { color: #888; font-size: 0.85rem; margin-bottom: 12px; line-height: 1.4; }
+.offer-item-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.75rem; color: #666; margin-bottom: 12px; }
+.offer-item-meta span { display: flex; align-items: center; gap: 4px; }
+.offer-actions { display: flex; gap: 8px; }
+
+#clientSettingsScreen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #0a0c12; z-index: 9999; display: none; flex-direction: column; overflow-y: auto; }
+#clientSettingsScreen.visible { display: flex; }
+.settings-header { background: linear-gradient(135deg, #1a1c24 0%, #0a0c12 100%); padding: 20px; border-bottom: 1px solid rgba(255, 107, 107, 0.2); position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; }
+.settings-title { font-family: 'Montserrat', sans-serif; font-size: 1.3rem; font-weight: 800; color: white; }
+.settings-close { background: rgba(255,255,255,0.1); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.settings-content { flex: 1; padding: 20px; padding-bottom: 100px; }
+.setting-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+.setting-card-title { font-family: 'Montserrat', sans-serif; font-size: 1rem; font-weight: 700; color: white; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+.setting-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.setting-row:last-child { border-bottom: none; }
+.setting-info { flex: 1; }
+.setting-name { font-weight: 600; color: #ddd; font-size: 0.9rem; }
+.setting-desc { font-size: 0.75rem; color: #666; margin-top: 3px; }
+.toggle-switch { position: relative; width: 50px; height: 28px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #333; transition: .3s; border-radius: 28px; }
+.toggle-slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px; background: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+input:checked + .toggle-slider { background: linear-gradient(135deg, #e8b89a, #e07050); }
+input:checked + .toggle-slider:before { transform: translateX(22px); }
+.range-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.range-label { color: #aaa; font-size: 0.85rem; }
+.range-display { color: #e07050; font-weight: 800; font-size: 1.1rem; font-family: 'Montserrat', sans-serif; }
+.settings-slider { width: 100%; height: 6px; -webkit-appearance: none; background: #333; border-radius: 3px; outline: none; margin-bottom: 8px; }
+.settings-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; background: linear-gradient(135deg, #e8b89a, #e07050); border-radius: 50%; cursor: pointer; box-shadow: 0 2px 10px rgba(255,107,107,0.5); border: 2px solid white; }
+.category-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.category-chip { padding: 12px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 12px; text-align: center; font-size: 0.8rem; color: #aaa; cursor: pointer; transition: all 0.3s; user-select: none; }
+.category-chip.selected { background: rgba(255, 107, 107, 0.15); border-color: #e8b89a; color: #e07050; font-weight: 600; }
+.category-chip:active { transform: scale(0.96); }
+.time-row { display: flex; align-items: center; gap: 15px; margin-top: 10px; }
+.time-row span { color: #888; font-size: 0.85rem; }
+.time-input-dark { background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; color: white; padding: 10px; font-family: 'Poppins', sans-serif; font-size: 1rem; outline: none; color-scheme: dark; }
+
+#map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1; }
+.panel-container { position: absolute; top: 50px; left: 10px; right: 10px; z-index: 1000; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); touch-action: pan-y; }
+.panel-container.minimized { transform: translateY(calc(-100% + 180px)); }
+.center-card { background: rgba(0, 0, 0, 0.92); backdrop-filter: blur(25px); border-radius: 25px; padding: 25px 20px 10px 20px; border: 2px solid rgba(255, 107, 107, 0.2); box-shadow: 0 20px 60px rgba(0,0,0,0.8); display: flex; flex-direction: column; }
+.header { text-align: center; margin-bottom: 25px; pointer-events: none; flex-shrink: 0; padding-top: 5px; }
+.logo { font-family: 'Montserrat', sans-serif; font-size: 2.8rem; font-weight: 900; letter-spacing: 5px; margin-bottom: 10px; background: linear-gradient(135deg, #e8b89a 0%, #e07050 50%, #e8b89a 100%); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 40px rgba(255,107,107,0.3); animation: shine 3s ease-in-out infinite; }
+@keyframes shine { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.2); } }
+.tagline { font-size: 0.9rem; font-weight: 400; letter-spacing: 2px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tagline .brand-m { color: #e8b89a; font-weight: 600; }
+.tagline .brand-e { color: #d4a080; font-weight: 600; }
+.tagline .brand-m2 { color: #e07050; font-weight: 600; }
+.tagline .brand-a { color: #e8b89a; font-weight: 600; }
+.content-area { transition: max-height 0.3s ease, opacity 0.3s ease; overflow: hidden; flex: 1; }
+.panel-container.minimized .content-area { max-height: 0; opacity: 0; pointer-events: none; }
+.swipe-area { width: 100%; padding: 10px 0 8px 0; cursor: grab; touch-action: pan-y; user-select: none; -webkit-user-select: none; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 5px; border-top: 1px solid rgba(212,168,146,0.15); position: relative; }
+.swipe-area:active { cursor: grabbing; }
+.menu-btn-in-swipe { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); background: rgba(255, 107, 107, 0.2); border: 1px solid rgba(255, 107, 107, 0.3); color: #e07050; padding: 6px 12px; border-radius: 15px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 0.7rem; cursor: pointer; transition: all 0.3s; z-index: 10; }
+.menu-btn-in-swipe:active { background: rgba(255, 107, 107, 0.4); transform: translateY(-50%) scale(0.95); }
+.settings-btn-in-swipe { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; padding: 6px 12px; border-radius: 15px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 0.7rem; cursor: pointer; transition: all 0.3s; z-index: 10; }
+.settings-btn-in-swipe:active { background: rgba(59, 130, 246, 0.4); transform: translateY(-50%) scale(0.95); }
+.drag-line { width: 40px; height: 4px; background: rgba(255,255,255,0.3); border-radius: 3px; }
+.swipe-arrow { font-size: 1.2rem; color: #e07050; animation: bounceArrow 1.5s ease-in-out infinite; }
+.panel-container.minimized .swipe-arrow { animation: bounceArrowUp 1.5s ease-in-out infinite; }
+@keyframes bounceArrow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes bounceArrowUp { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+.swipe-hint { font-size: 0.65rem; color: #666; margin-top: 2px; }
+
+.gps-button { width: 100%; padding: 15px; background: linear-gradient(135deg, #e8b89a 0%, #e07050 100%); color: white; border: none; border-radius: 20px; font-weight: 800; font-size: 1rem; cursor: pointer; margin-bottom: 15px; box-shadow: 0 10px 30px rgba(255,107,107,0.4); transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 10px; text-transform: uppercase; letter-spacing: 1px; }
+.gps-button:active { transform: scale(0.98); }
+.gps-icon { width: 20px; height: 20px; border: 2px solid white; border-radius: 50%; position: relative; animation: pulse 2s infinite; }
+.gps-icon::after { content: ''; position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translate(-50%, -50%); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.7); } 70% { box-shadow: 0 0 0 10px rgba(255,255,255,0); } 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); } }
+
+.filters { display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px; }
+.filter-row { display: flex; justify-content: space-between; align-items: center; }
+.filter-label { font-size: 0.85rem; color: #aaa; display: flex; align-items: center; gap: 8px; }
+.filter-value { color: #e07050; font-weight: 700; font-size: 0.95rem; }
+input[type="range"] { width: 100%; height: 6px; -webkit-appearance: none; background: #333; border-radius: 3px; outline: none; margin-top: 8px; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; background: linear-gradient(135deg, #e8b89a, #e07050); border-radius: 50%; cursor: pointer; box-shadow: 0 2px 10px rgba(255,107,107,0.5); border: 2px solid white; }
+
+.search-btn { width: 100%; padding: 18px; background: white; color: #0a0c12; border: none; border-radius: 20px; font-weight: 900; font-size: 1rem; cursor: pointer; margin-bottom: 10px; transition: all 0.3s; text-transform: uppercase; letter-spacing: 1px; }
+.search-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.search-btn:active:not(:disabled) { transform: scale(0.98); }
+.status { text-align: center; font-size: 0.8rem; color: #888; min-height: 20px; }
+
+.info-card {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(13, 15, 14, 0.97);
+  backdrop-filter: blur(25px);
+  border-radius: 20px 20px 0 0;
+  padding: 12px 16px 20px 16px;
+  border: none;
+  border-top: 2px solid rgba(212,168,146,0.25);
+  display: none;
+  pointer-events: auto;
+  box-shadow: 0 -8px 30px rgba(0,0,0,0.5);
+  max-height: 45vh;
+  overflow-y: auto;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease;
+  touch-action: pan-y;
+}
+.info-card.visible {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+}
+.info-card.visible {
+  display: block;
+  transform: translateY(0);
+  opacity: 1;
+}
+@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.place-name { font-size: 1.2rem; font-weight: 700; margin-bottom: 5px; }
+.place-price { color: #e07050; font-weight: 700; font-size: 1rem; margin-bottom: 8px; }
+.place-address { color: #aaa; font-size: 0.85rem; margin-bottom: 15px; }
+.nav-btn { width: 100%; padding: 15px; background: linear-gradient(135deg, #5ec49a, #4eb488); color: white; border: none; border-radius: 20px; font-weight: 800; font-size: 1rem; cursor: pointer; }
+.close-btn { position: absolute; top: 15px; right: 15px; width: 32px; height: 32px; background: rgba(255,255,255,0.1); border: none; border-radius: 50%; color: white; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+.custom-marker { min-width: 50px; height: 36px; background: linear-gradient(135deg, #e8b89a, #e07050); border-radius: 18px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.85rem; color: white; border: 3px solid white; box-shadow: 0 3px 10px rgba(0,0,0,0.4); padding: 0 10px; white-space: nowrap; }
+.user-marker { width: 24px; height: 24px; background: #7ec4b8; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 4px rgba(59,130,246,0.3); animation: pulseBlue 2s infinite; }
+@keyframes pulseBlue { 0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.6); } 70% { box-shadow: 0 0 0 12px rgba(59,130,246,0); } 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); } }
+
+.loader { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.mema-pin .mema-marker { min-width: 70px; height: 44px; background: linear-gradient(135deg, #e8b89a 0%, #e07050 100%); border-radius: 22px; display: flex; align-items: center; justify-content: center; gap: 4px; font-weight: 900; font-size: 0.85rem; color: white; border: 3px solid white; box-shadow: 0 4px 15px rgba(255,107,107,0.5); padding: 0 12px; white-space: nowrap; position: relative; }
+.mema-pin .mema-marker::after { content: ''; position: absolute; bottom: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 10px solid #e8b89a; }
+.mema-pin .mema-price { font-family: 'Montserrat', sans-serif; }
+.mema-pin .mema-badge { font-size: 0.7rem; }
+.mema-pin.premium .mema-marker { background: linear-gradient(135deg, #9e8aa8 0%, #b66a83 100%); box-shadow: 0 4px 20px rgba(168,85,247,0.6); }
+.mema-pin.premium .mema-marker::after { border-top-color: #9e8aa8; }
+
+.rating-display { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; }
+.rating-stars { color: #e8d080; font-size: 0.9rem; }
+.rating-count { color: #888; font-size: 0.75rem; }
+.review-section { margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); }
+.review-title { font-size: 0.9rem; font-weight: 700; color: #ddd; margin-bottom: 10px; }
+.review-item { background: rgba(255,255,255,0.03); border-radius: 10px; padding: 10px; margin-bottom: 8px; }
+.review-stars { color: #e8d080; font-size: 0.8rem; }
+.review-text { color: #aaa; font-size: 0.8rem; margin-top: 4px; }
+.review-date { color: #666; font-size: 0.7rem; margin-top: 4px; }
+.star-rating-input { display: flex; gap: 5px; margin-bottom: 10px; justify-content: center; }
+.star-btn { background: none; border: none; font-size: 1.5rem; color: #444; cursor: pointer; transition: color 0.2s; }
+.star-btn.active { color: #e8d080; }
+.star-btn:hover { color: #e8d080; }
+.review-textarea { width: 100%; padding: 10px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; color: white; font-family: 'Poppins', sans-serif; font-size: 0.85rem; outline: none; resize: vertical; min-height: 60px; }
+.review-textarea:focus { border-color: #e8b89a; }
+.submit-review-btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #e8b89a, #e07050); color: white; border: none; border-radius: 12px; font-weight: 700; font-size: 0.9rem; cursor: pointer; margin-top: 10px; }
+
+.toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(100px); background: rgba(0,0,0,0.9); color: white; padding: 12px 24px; border-radius: 25px; font-size: 0.85rem; z-index: 10001; opacity: 0; transition: all 0.3s ease; border: 1px solid rgba(255,107,107,0.3); }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.success { border-color: #5ec49a; }
+.toast.error { border-color: #e07050; }
+
+/* Merchant map picker */
+#merchantMapPicker { width: 100%; height: 250px; border-radius: 12px; margin-bottom: 15px; border: 2px solid rgba(255,255,255,0.1); }
+.coord-hint { font-size: 0.75rem; color: #666; margin-top: -15px; margin-bottom: 15px; }
+
+.place-offer-title { font-size: 1.1rem; font-weight: 700; color: #fff; margin: 12px 0 6px 0; line-height: 1.3; }
+.place-offer-desc { font-size: 0.85rem; color: #aaa; line-height: 1.5; margin-bottom: 10px; }
+.place-offer-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.offer-meta-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.offer-meta-badge.category { background: rgba(255, 159, 74, 0.15); color: #e07050; border: 1px solid rgba(255, 159, 74, 0.25); }
+.offer-meta-badge.radius { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.25); }
+.place-price-container { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 12px 0; flex-wrap: wrap; }
+.place-original-price { font-size: 0.9rem; color: #666; text-decoration: line-through; text-decoration-color: #e8b89a; }
+.place-discounted-price { font-size: 1.4rem; font-weight: 800; color: #e07050; font-family: 'Montserrat', sans-serif; }
+.place-discount-badge { display: inline-flex; align-items: center; background: linear-gradient(135deg, #e8b89a, #e07050); color: white; padding: 3px 10px; border-radius: 10px; font-size: 0.75rem; font-weight: 800; }
+.distance-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(255, 159, 74, 0.15); border: 1px solid rgba(255, 159, 74, 0.3); color: #e07050; padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; margin-bottom: 12px; }
+.distance-badge svg { width: 14px; height: 14px; }
+
+
+.food-image { display: none; }
+.food-gradient-orb {
+  width: 100%; height: 100%; border-radius: 50%;
+  background: conic-gradient(from 0deg, #D4A574, #E8C9A0, #F5E6D3, #C9956C, #E8C9A0, #B8834F, #D4A574);
+  animation: orbRotate 8s linear infinite, foodExplode 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+  box-shadow: 0 20px 60px rgba(212, 165, 116, 0.4), inset 0 0 40px rgba(255,255,255,0.15);
+  border: 4px solid rgba(245, 230, 211, 0.4);
+  position: relative; overflow: hidden;
+}
+.food-gradient-orb::before {
+  content: ''; position: absolute; inset: 15%; border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2), transparent 60%);
+}
+@keyframes orbRotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.orb-icon-container {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  font-size: 2.8rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+}
+.orb-icon-main { animation: orbBounce 2s ease-in-out infinite; filter: drop-shadow(0 0 10px rgba(255,255,255,0.7)) drop-shadow(0 2px 4px rgba(0,0,0,0.4)); }
+.orb-icon-secondary { font-size: 2.4rem; opacity: 1; filter: drop-shadow(0 0 10px rgba(255,255,255,0.7)) drop-shadow(0 2px 4px rgba(0,0,0,0.4)); animation: orbBounce 2s ease-in-out infinite 0.3s; }
+@keyframes orbBounce { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-6px) scale(1.05); } }
+@media (max-width: 360px) {
+  .orb-icon-container { font-size: 2.2rem; }
+  .orb-icon-secondary { font-size: 1.4rem; }
+  .intro-buttons { width: 90%; gap: 12px; margin-top: 25px; }
+  .intro-btn-client, .intro-btn-comerciant { padding: 16px 30px; font-size: 1.15rem; letter-spacing: 3px; border-radius: 25px; }
+  .food-image-container { width: 180px; height: 180px; }
+  .intro-logo { font-size: 2.8rem; letter-spacing: 4px; }
+}
+.daynight-btn-in-swipe {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  background: rgba(255, 193, 7, 0.15); border: 1px solid rgba(255, 193, 7, 0.3);
+  color: #ffc107; width: 32px; height: 32px; border-radius: 50%;
+  font-size: 1rem; cursor: pointer; transition: all 0.3s; z-index: 10;
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.daynight-btn-in-swipe:active { background: rgba(255, 193, 7, 0.4); transform: translate(-50%, -50%) scale(0.9); }
+
+
+/* ====== LIGHT MODE MANUAL TOGGLE ====== */
+body.light-mode { background: #f5f5f7; color: #1a1a1a; }
+body.light-mode #introScreen { background: linear-gradient(135deg, #ffffff 0%, #f0f0f5 100%); }
+body.light-mode .intro-logo { text-shadow: none; filter: drop-shadow(0 2px 8px rgba(255,107,107,0.3)); }
+body.light-mode .intro-tagline { color: #666; }
+body.light-mode .intro-btn-client { box-shadow: 0 10px 30px rgba(255,107,107,0.3); }
+body.light-mode .intro-btn-comerciant { box-shadow: 0 10px 30px rgba(124,205,180,0.3); }
+body.light-mode #authScreen { background: linear-gradient(135deg, #ffffff 0%, #f0f0f5 100%); }
+body.light-mode .auth-title { color: #1a1a1a; }
+body.light-mode .phone-input, body.light-mode .otp-input { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); color: #1a1a1a; }
+body.light-mode .phone-input::placeholder, body.light-mode .otp-input::placeholder { color: #999; }
+body.light-mode #merchantDashboard { background: #f5f5f7; }
+body.light-mode .merchant-header { background: linear-gradient(135deg, #ffffff 0%, #f5f5f7 100%); border-bottom-color: rgba(255,107,107,0.15); }
+body.light-mode .merchant-title { color: #1a1a1a; }
+body.light-mode .merchant-tab { background: rgba(0,0,0,0.05); color: #666; }
+body.light-mode .merchant-content { background: #f5f5f7; }
+body.light-mode .form-input { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); color: #1a1a1a; }
+body.light-mode .form-input::placeholder { color: #999; }
+body.light-mode .form-label { color: #555; }
+body.light-mode .section-title { color: #1a1a1a; }
+body.light-mode .menu-item-card, body.light-mode .offer-item-card, body.light-mode .stat-box, body.light-mode .setting-card { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.08); }
+body.light-mode .menu-item-name, body.light-mode .offer-item-title, body.light-mode .place-name, body.light-mode .settings-title { color: #1a1a1a; }
+body.light-mode .menu-item-desc, body.light-mode .offer-item-desc, body.light-mode .setting-desc, body.light-mode .status { color: #666; }
+body.light-mode #clientSettingsScreen { background: #f5f5f7; }
+body.light-mode .settings-header { background: linear-gradient(135deg, #ffffff 0%, #f5f5f7 100%); }
+body.light-mode .setting-name { color: #333; }
+body.light-mode .category-chip { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); color: #555; }
+body.light-mode .category-chip.selected { background: rgba(255,107,107,0.1); }
+body.light-mode .time-input-dark { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); color: #1a1a1a; }
+body.light-mode .panel-container .center-card { background: rgba(255,255,255,0.95); border-color: rgba(255,107,107,0.15); }
+body.light-mode .tagline { color: #666; }
+body.light-mode .filter-label { color: #555; }
+body.light-mode .info-card { background: rgba(255,255,255,0.95); border-color: rgba(255,107,107,0.15); }
+body.light-mode .review-text { color: #555; }
+body.light-mode .review-date { color: #888; }
+body.light-mode .place-address { color: #555; }
+body.light-mode .toast { background: rgba(30,30,30,0.95); color: white; }
+body.light-mode .nav-btn { color: white; }
+body.light-mode .search-btn { background: #e8b89a; color: #0d0f0e; }
+body.light-mode .gps-button { color: #0d0f0e; }
+body.light-mode .auth-btn { color: white; }
+body.light-mode .save-btn { color: white; }
+body.light-mode .close-btn { background: rgba(0,0,0,0.1); color: #1a1a1a; }
+body.light-mode .settings-close { background: rgba(0,0,0,0.1); color: #1a1a1a; }
+body.light-mode .swipe-area { border-top-color: rgba(0,0,0,0.1); }
+body.light-mode .drag-line { background: rgba(0,0,0,0.2); }
+body.light-mode .swipe-hint { color: #888; }
+body.light-mode .empty-state { color: #888; }
+body.light-mode .coord-hint { color: #888; }
+body.light-mode .info-box { background: rgba(59,130,246,0.08); color: #2563eb; }
+body.light-mode .rating-count { color: #888; }
+body.light-mode .review-section { border-top-color: rgba(0,0,0,0.1); }
+body.light-mode .place-offer-desc { color: #555; }
+body.light-mode .place-original-price { color: #999; }
+body.light-mode .daynight-btn-in-swipe { background: rgba(33, 150, 243, 0.15); border-color: rgba(33, 150, 243, 0.3); color: #2196f3; }
+
+
+/* ====== RIPPLE EFFECT ====== */
+.ripple-btn{position:relative;overflow:hidden}
+.ripple-btn::after{content:'';position:absolute;top:50%;left:50%;width:0;height:0;background:rgba(255,255,255,0.25);border-radius:50%;transform:translate(-50%,-50%);transition:width .5s,height .5s,opacity .5s;opacity:0}
+.ripple-btn:active::after{width:300px;height:300px;opacity:1;transition:0s}
+
+/* ====== SKELETON LOADING ====== */
+.skeleton{background:linear-gradient(90deg,rgba(255,255,255,.05)25%,rgba(255,255,255,.1)50%,rgba(255,255,255,.05)75%);background-size:200% 100%;animation:skeletonShimmer 1.5s infinite;border-radius:8px}
+@keyframes skeletonShimmer{0%{background-position:200%0}100%{background-position:-200%0}}
+.skeleton-text{height:14px;margin-bottom:8px}
+.skeleton-title{height:20px;width:60%;margin-bottom:12px}
+.skeleton-circle{width:50px;height:50px;border-radius:50%}
+
+/* ====== SAFE AREA TOAST ====== */
+.toast{bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%)translateY(calc(100% + 20px));max-width:calc(100% - 40px);text-align:center;word-wrap:break-word}
+.toast.show{transform:translateX(-50%)translateY(0)}
+
+
+/* ====== INTRO DAY/NIGHT TOGGLE ====== */
+.intro-daynight-row {
+  margin-top: 50px;
+  display: flex;
+  justify-content: center;
+  z-index: 100;
+}
+.intro-daynight-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(212, 168, 146, 0.15);
+  border: 1.5px solid rgba(212, 168, 146, 0.4);
+  color: #e8b89a;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.intro-daynight-btn:hover {
+  background: rgba(212, 168, 146, 0.3);
+  border-color: rgba(212, 168, 146, 0.6);
+  transform: scale(1.1);
+}
+.intro-daynight-btn:active {
+  transform: scale(0.95);
+}
+@media (max-width: 360px) {
+  .intro-daynight-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 1.1rem;
+  }
+}
+
+</style>
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a0c12">
+<meta name="apple-mobile-web-app-title" content="MEMA">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<!-- Icon pentru iOS -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect fill='%23e07050' width='180' height='180' rx='30'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='central' text-anchor='middle' font-size='80'%3E🍽️%3C/text%3E%3C/svg%3E">
+
+</head>
+<body>
+
+<!-- INTRO SCREEN -->
+<div id="introScreen">
+  <div class="food-image-container">
+    <div class="food-gradient-orb">
+      <div class="orb-icon-container">
+        <span class="orb-icon-secondary">🛒</span>
+        <span class="orb-icon-main">🍽️</span>
+      </div>
+    </div>
+    <div class="explosion-container">
+      <div class="explosion-particle"></div><div class="explosion-particle"></div><div class="explosion-particle"></div><div class="explosion-particle"></div>
+      <div class="explosion-particle"></div><div class="explosion-particle"></div><div class="explosion-particle"></div><div class="explosion-particle"></div>
+      <div class="explosion-particle"></div><div class="explosion-particle"></div><div class="explosion-particle"></div><div class="explosion-particle"></div>
+      <div class="explosion-particle"></div><div class="explosion-particle"></div><div class="explosion-particle"></div><div class="explosion-particle"></div>
+    </div>
+  </div>
+  <div class="intro-logo-container">
+    <div class="intro-logo">MEMA</div>
+    <div class="intro-tagline">
+      <span class="brand-m">M</span>ananci <span class="brand-e">E</span>conomic, <span class="brand-m2">M</span>ananci <span class="brand-a">A</span>proape
+    </div>
+  </div>
+  <div class="intro-buttons">
+    <button class="intro-btn-client" onclick="selectUserType('client')">CLIENT</button>
+    <button class="intro-btn-comerciant" onclick="selectUserType('merchant')">COMERCIANT</button>
+  </div>
+  <div class="intro-daynight-row">
+    <button class="intro-daynight-btn" id="dayNightBtn" onclick="toggleDayNight()" title="Mod luminos">☀️</button>
+  </div>
+  </div>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen">
+  <div class="auth-container">
+    <div class="auth-title">Autentificare</div>
+    <div class="auth-subtitle" id="authSubtitle">Introdu numarul de telefon</div>
+    <div class="auth-type-badge" id="authTypeBadge">CLIENT</div>
+    <div id="phoneStep">
+      <div class="phone-input-container">
+        <span class="phone-prefix">+40</span>
+        <input type="tel" class="phone-input" id="phoneInput" placeholder="7xx xxx xxx" maxlength="9">
+      </div>
+      <div class="auth-error" id="phoneError"></div>
+      <div class="auth-info" id="phoneInfo"></div>
+      <button class="auth-btn" id="sendOtpBtn" onclick="sendOTP()">Trimite cod SMS</button>
+    </div>
+    <div id="otpStep" style="display: none;">
+      <div class="auth-subtitle">Introdu codul primit</div>
+      <div class="otp-container">
+        <input type="text" class="otp-input" id="otp1" maxlength="1" oninput="handleOtpInput(this, 1)" inputmode="numeric">
+        <input type="text" class="otp-input" id="otp2" maxlength="1" oninput="handleOtpInput(this, 2)" inputmode="numeric">
+        <input type="text" class="otp-input" id="otp3" maxlength="1" oninput="handleOtpInput(this, 3)" inputmode="numeric">
+        <input type="text" class="otp-input" id="otp4" maxlength="1" oninput="handleOtpInput(this, 4)" inputmode="numeric">
+        <input type="text" class="otp-input" id="otp5" maxlength="1" oninput="handleOtpInput(this, 5)" inputmode="numeric">
+        <input type="text" class="otp-input" id="otp6" maxlength="1" oninput="handleOtpInput(this, 6)" inputmode="numeric">
+      </div>
+      <div class="auth-error" id="otpError"></div>
+      <div class="auth-info" id="otpInfo"></div>
+      <button class="auth-btn" id="verifyOtpBtn" onclick="verifyOTP()">Verifica codul</button>
+      <button class="auth-back-btn" onclick="backToPhone()">&#8592; Inapoi</button>
+    </div>
+    <button class="auth-back-btn" id="backToIntroBtn" onclick="backToIntroFromAuth()">&#8592; Inapoi la meniu</button>
+  </div>
+</div>
+
+<!-- MERCHANT DASHBOARD -->
+<div id="merchantDashboard">
+  <div class="merchant-header">
+    <div class="merchant-header-top">
+      <div class="merchant-title">Dashboard Comerciant</div>
+      <button class="merchant-logout" onclick="logout()">Iesire</button>
+    </div>
+    <div class="merchant-tabs">
+      <button class="merchant-tab active" onclick="switchTab('location')" id="tabLocation">Localul meu</button>
+      <button class="merchant-tab" onclick="switchTab('offers')" id="tabOffers">Oferte</button>
+      <button class="merchant-tab" onclick="switchTab('stats')" id="tabStats">Statistici</button>
+    </div>
+  </div>
+  <div class="merchant-content" id="merchantContent">
+    <div id="locationForm">
+      <div class="section-title">Informatii local</div>
+      <div class="form-group"><label class="form-label">Numele localului *</label><input type="text" class="form-input" id="locName" placeholder="ex: Restaurantul Bucuresti"></div>
+      <div class="form-group"><label class="form-label">Adresa completa *</label><input type="text" class="form-input" id="locAddress" placeholder="ex: Strada Victoriei nr. 10, Bucuresti" onchange="geocodeAddress()"></div>
+
+      <div class="info-box">
+        <strong>Pin pe harta:</strong> Daca adresa nu este gasita automat, muta pin-ul rosu pe harta de mai jos pentru a seta locatia exacta.
+      </div>
+      <div id="merchantMapPicker"></div>
+      <div class="dual-input-row">
+        <div class="form-group"><label class="form-label">Latitudine</label><input type="number" class="form-input" id="locLat" placeholder="auto" step="any" readonly></div>
+        <div class="form-group"><label class="form-label">Longitudine</label><input type="number" class="form-input" id="locLng" placeholder="auto" step="any" readonly></div>
+      </div>
+      <div class="coord-hint" id="coordHint">Coordonatele se completeaza automat din adresa sau din pin-ul de pe harta.</div>
+
+      <div class="form-group"><label class="form-label">Telefon local</label><input type="tel" class="form-input" id="locPhone" placeholder="ex: 0722 123 456"></div>
+      <div class="form-group"><label class="form-label">Descriere</label><textarea class="form-input form-textarea" id="locDesc" placeholder="Descrie-ti localul..."></textarea></div>
+      <div class="form-group"><label class="form-label">Logo (URL imagine)</label><input type="url" class="form-input" id="locLogoUrl" placeholder="https://example.com/logo.jpg"></div>
+      <button class="save-btn" id="saveLocationBtn" onclick="saveLocation()">Salveaza localul</button>
+      <div class="section-title" style="margin-top:30px">Status</div>
+      <div class="info-box" id="merchantStatusBox">
+        <strong>Status abonament:</strong> <span id="subStatus">Se incarca...</span><br>
+        <strong>Rating:</strong> <span id="merchantRating">Se incarca...</span><br>
+        <strong>Oferte active:</strong> <span id="merchantActiveOffers">Se incarca...</span>
+      </div>
+    </div>
+    <div id="offersForm" style="display: none;">
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-value" id="statTotalOffers">0</div><div class="stat-label">Oferte Totale</div></div>
+        <div class="stat-box"><div class="stat-value" id="statActiveOffers">0</div><div class="stat-label">Oferte Active</div></div>
+        <div class="stat-box"><div class="stat-value" id="statSent">0</div><div class="stat-label">Trimise</div></div>
+        <div class="stat-box"><div class="stat-value" id="statClicks">0</div><div class="stat-label">Click-uri</div></div>
+      </div>
+      <div class="section-title">Creare Oferta Noua</div>
+      <div class="form-group"><label class="form-label">Titlu Oferta *</label><input type="text" class="form-input" id="offerTitle" placeholder="Ex: Reducere 20% la cafea" maxlength="50"></div>
+      <div class="form-group"><label class="form-label">Descriere *</label><textarea class="form-input form-textarea" id="offerDescription" rows="3" maxlength="150" placeholder="Descrie oferta ta..."></textarea></div>
+      <div class="dual-input-row">
+        <div class="form-group"><label class="form-label">Pret Original (lei)</label><input type="number" class="form-input" id="offerOriginalPrice" min="0" step="0.5" placeholder="ex: 50"></div>
+        <div class="form-group"><label class="form-label">Pret Redus (lei)</label><input type="number" class="form-input" id="offerDiscountedPrice" min="0" step="0.5" placeholder="ex: 40"></div>
+      </div>
+      <div class="dual-input-row">
+        <div class="form-group"><label class="form-label">Reducere (%)</label><input type="number" class="form-input" id="offerDiscount" min="0" max="100" placeholder="ex: 20"></div>
+        <div class="form-group"><label class="form-label">Categorie</label>
+          <select class="form-input form-select" id="offerCategory">
+            <option value="food">Mancare & Bautura</option><option value="fashion">Fashion</option><option value="electronics">Electronice</option>
+            <option value="beauty">Frumusete</option><option value="sports">Sport</option><option value="home">Casa & Gradina</option>
+            <option value="entertainment">Divertisment</option><option value="travel">Travel</option><option value="health">Sanatate</option><option value="other">Altele</option>
+          </select>
+        </div>
+      </div>
+      <div class="dual-input-row">
+        <div class="form-group"><label class="form-label">Raza Acoperire (m) *</label><input type="number" class="form-input" id="offerRadius" required min="10" max="5000" value="50" step="10"></div>
+        <div class="form-group"><label class="form-label">Expira la</label><input type="datetime-local" class="form-input" id="offerExpires" style="color-scheme: dark;"></div>
+      </div>
+      <div class="info-box">
+        <strong>Recomandari distanta (10m - 5000m):</strong><br>
+        &#8226; <strong>10-30m</strong> - Clienti langa vitrina/bloc<br>
+        &#8226; <strong>50-100m</strong> - Cel mai fiabil pentru majoritatea magazinelor<br>
+        &#8226; <strong>200m-5000m</strong> - Atragere din zona/cartier
+      </div>
+      <div class="form-group"><label class="form-label">Imagine (URL optional)</label><input type="url" class="form-input" id="offerImageUrl" placeholder="https://example.com/image.jpg"></div>
+      <button class="save-btn" id="createOfferBtn" onclick="createOffer()" style="margin-bottom: 10px;">Programeaza Oferta</button>
+      <div class="section-title" style="margin-top: 30px;">Ofertele Tale</div>
+      <div id="offersList">
+        <div class="empty-state"><div class="empty-state-icon">&#127919;</div><div>Nicio oferta creata inca</div></div>
+      </div>
+    </div>
+    <div id="statsForm" style="display: none;">
+      <div class="section-title">Statistici Comerciant</div>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-value" id="statViews">0</div><div class="stat-label">Vizualizari</div></div>
+        <div class="stat-box"><div class="stat-value" id="statReviews">0</div><div class="stat-label">Review-uri</div></div>
+        <div class="stat-box"><div class="stat-value" id="statAvgRating">0.0</div><div class="stat-label">Rating Mediu</div></div>
+        <div class="stat-box"><div class="stat-value" id="statConversion">0%</div><div class="stat-label">Conversie</div></div>
+      </div>
+      <div class="section-title">Review-uri Recente</div>
+      <div id="merchantReviewsList">
+        <div class="empty-state"><div class="empty-state-icon">&#11088;</div><div>Niciun review inca</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CLIENT SETTINGS SCREEN -->
+<div id="clientSettingsScreen">
+  <div class="settings-header">
+    <div class="settings-title">Setari</div>
+    <button class="settings-close" onclick="closeClientSettings()">&#215;</button>
+  </div>
+  <div class="settings-content">
+    <div class="setting-card">
+      <div class="setting-card-title">Notificari Push</div>
+      <div class="setting-row">
+        <div class="setting-info"><div class="setting-name">Activeaza notificarile</div><div class="setting-desc">Primesti oferte de la comercianti din apropiere</div></div>
+        <label class="toggle-switch"><input type="checkbox" id="settingPushEnabled" onchange="togglePushSetting()"><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+    <div class="setting-card">
+      <div class="setting-card-title">Raza de Acoperire</div>
+      <div class="range-label-row"><span class="range-label">Distanta maxima pentru oferte</span><span class="range-display" id="settingRadiusValue">1000 m</span></div>
+      <input type="range" class="settings-slider" id="settingRadius" min="10" max="5000" step="10" value="1000" oninput="updateSettingRadius(this.value)" onchange="saveSettingRadius(this.value)">
+      <div class="setting-desc" style="text-align: center; margin-top: 8px;">Interval: 10m - 5000m</div>
+    </div>
+    <div class="setting-card">
+      <div class="setting-card-title">Interval Pret (RON)</div>
+      <div class="dual-input-row">
+        <div class="form-group"><label class="form-label">Pret minim</label><input type="number" class="form-input" id="settingMinPrice" min="0" placeholder="0" onchange="savePriceSettings()"></div>
+        <div class="form-group"><label class="form-label">Pret maxim</label><input type="number" class="form-input" id="settingMaxPrice" min="0" placeholder="Nelimitat" onchange="savePriceSettings()"></div>
+      </div>
+    </div>
+    <div class="setting-card">
+      <div class="setting-card-title">Ore Active</div>
+      <div class="setting-desc" style="margin-bottom: 12px;">Primesti notificari doar in acest interval</div>
+      <div class="time-row">
+        <span>De la:</span><input type="time" class="time-input-dark" id="settingActiveFrom" value="08:00" onchange="saveTimeSettings()">
+        <span>Pana la:</span><input type="time" class="time-input-dark" id="settingActiveUntil" value="22:00" onchange="saveTimeSettings()">
+      </div>
+    </div>
+    <div class="setting-card">
+      <div class="setting-card-title">Categorii Preferate</div>
+      <div class="category-grid" id="categoryGrid">
+        <div class="category-chip selected" data-value="food" onclick="toggleCategory(this)">Mancare</div>
+        <div class="category-chip" data-value="fashion" onclick="toggleCategory(this)">Fashion</div>
+        <div class="category-chip" data-value="electronics" onclick="toggleCategory(this)">Electronice</div>
+        <div class="category-chip" data-value="beauty" onclick="toggleCategory(this)">Frumusete</div>
+        <div class="category-chip" data-value="sports" onclick="toggleCategory(this)">Sport</div>
+        <div class="category-chip" data-value="home" onclick="toggleCategory(this)">Casa</div>
+        <div class="category-chip" data-value="entertainment" onclick="toggleCategory(this)">Divertisment</div>
+        <div class="category-chip" data-value="travel" onclick="toggleCategory(this)">Travel</div>
+      </div>
+    </div>
+    <button class="save-btn" onclick="saveAllClientSettings()" style="margin-top: 10px;">Salveaza Toate Setarile</button>
+  </div>
+</div>
+
+<!-- MAIN APP CLIENT -->
+<div id="map"></div>
+<div class="panel-container" id="panelContainer">
+  <div class="center-card">
+    <div class="header">
+      <div class="logo">MEMA</div>
+      <div class="tagline">
+        <span class="brand-m">M</span>ananci <span class="brand-e">E</span>conomic, <span class="brand-m2">M</span>ananci <span class="brand-a">A</span>proape
+      </div>
+    </div>
+    <div class="content-area" id="contentArea">
+      <button class="gps-button" onclick="getLocation()"><div class="gps-icon"></div>LOCALIZEAZA-MA</button>
+      <div class="filters">
+        <div>
+          <div class="filter-row"><span class="filter-label">Raza de cautare</span><span class="filter-value" id="radiusValue">1000 m</span></div>
+          <input type="range" id="radiusSlider" min="10" max="5000" step="10" value="1000">
+        </div>
+        <div>
+          <div class="filter-row"><span class="filter-label">Buget maxim</span><span class="filter-value" id="budgetValue">50 lei</span></div>
+          <input type="range" id="budgetSlider" min="10" max="1000" step="10" value="50">
+        </div>
+      </div>
+      <button class="search-btn" id="searchBtn" onclick="searchOffers()">CAUTA OFERTE MEMA</button>
+      <div class="status" id="status">Apasa LOCALIZEAZA-MA pentru a incepe</div>
+    </div>
+    <div class="swipe-area" id="swipeArea">
+      <button class="menu-btn-in-swipe" onclick="logout()">&#8592; Meniu</button>
+      <button class="settings-btn-in-swipe" onclick="openClientSettings()">Setari</button>
+      <div class="drag-line"></div>
+      <div class="swipe-arrow" id="swipeArrow">&#8657;</div>
+      <div class="swipe-hint" id="swipeHint">Swipe in sus pentru a minimiza</div>
+    </div>
+  </div>
+</div>
+
+<div id="infoCard" class="info-card">
+  <button class="close-btn" onclick="closeCard()">&#215;</button>
+  <div id="placeName" class="place-name"></div>
+  <div id="distanceBadge" class="distance-badge"></div>
+  <div class="rating-display" id="placeRating"></div>
+  <div id="placeOfferTitle" class="place-offer-title"></div>
+  <div id="placeOfferDesc" class="place-offer-desc"></div>
+  <div id="placeOfferMeta" class="place-offer-meta"></div>
+  <div class="place-price-container" id="placePriceContainer">
+    <span id="placeOriginalPrice" class="place-original-price"></span>
+    <span id="placeDiscountedPrice" class="place-discounted-price"></span>
+    <span id="placeDiscountBadge" class="place-discount-badge"></span>
+  </div>
+  <div id="placeAddress" class="place-address"></div>
+  <button class="nav-btn" onclick="navigate()">Navigare Google Maps</button>
+  <div class="review-section" id="reviewSection">
+    <div class="review-title">Lasa un review</div>
+    <div class="star-rating-input" id="starRatingInput">
+      <button class="star-btn" onclick="setStarRating(1)">&#9733;</button>
+      <button class="star-btn" onclick="setStarRating(2)">&#9733;</button>
+      <button class="star-btn" onclick="setStarRating(3)">&#9733;</button>
+      <button class="star-btn" onclick="setStarRating(4)">&#9733;</button>
+      <button class="star-btn" onclick="setStarRating(5)">&#9733;</button>
+    </div>
+    <textarea class="review-textarea" id="reviewComment" placeholder="Scrie experienta ta..."></textarea>
+    <button class="submit-review-btn" onclick="submitReview()">Trimite Review</button>
+    <div class="review-title" style="margin-top:20px">Review-uri</div>
+    <div id="reviewsList"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// ============================================
+// MEMA v4.1 - FIX Auth Real + Map Localizare
+// ============================================
+
+// === CONFIGURARE SUPABASE ===
+// IMPORTANT: Inlocuieste cu cheia ta ANON reala din Supabase Dashboard -> Settings -> API
+// Cheia trebuie sa fie un JWT token (incepe cu "eyJhbGci...")
+const SUPABASE_URL = 'https://dkxafoncrgqtuzwhahop.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRreGFmb25jcmdxdHV6d2hhaG9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzMjg3NzIsImV4cCI6MjA5MTkwNDc3Mn0.utucx0vlTZsg8t3LcWzReD-t6PFT23EaGl-LzQEX8JI'; // <-- INLOCUIESTE ASTA!
+
+let supabaseClient = null;
+let currentSession = null;
+let currentUser = null;
+let currentUserType = null;
+let map;
+let userMarker;
+let radiusCircle;
+let placeMarkers = [];
+let currentLat = null;
+let currentLng = null;
+let selectedPlace = null;
+let isMinimized = false;
+let touchStartY = 0;
+let touchEndY = 0;
+let isDragging = false;
+let tempOtpCode = null;
+let merchantOffers = [];
+let currentStarRating = 0;
+let AUTH_MODE = 'real';
+let merchantMap = null;
+let merchantMapMarker = null;
+
+let clientSettings = {
+  pushEnabled: true,
+  maxDistanceKm: 1,
+  minPrice: null,
+  maxPrice: null,
+  activeFrom: '08:00',
+  activeUntil: '22:00',
+  categories: ['food']
+};
+
+
+let isDarkMode = true;
+let currentTileLayer = null;
+let merchantTileLayer = null;
+
+function getTileUrl(dark) {
+  return dark
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+}
+
+function applyDayNightMode(dark) {
+  isDarkMode = dark;
+  const body = document.body;
+  if (dark) { body.classList.remove('light-mode'); }
+  else { body.classList.add('light-mode'); }
+  const tileUrl = getTileUrl(dark);
+  if (currentTileLayer && map) {
+    map.removeLayer(currentTileLayer);
+    currentTileLayer = L.tileLayer(tileUrl, { maxZoom: 19, attribution: '' }).addTo(map);
+  }
+  if (merchantTileLayer && merchantMap) {
+    merchantMap.removeLayer(merchantTileLayer);
+    merchantTileLayer = L.tileLayer(tileUrl, { maxZoom: 19, attribution: '' }).addTo(merchantMap);
+  }
+  const btn = document.getElementById('dayNightBtn');
+  if (btn) {
+    btn.textContent = dark ? '☀️' : '🌙';
+    btn.title = dark ? 'Mod luminos' : 'Mod întunecat';
+  }
+  try { localStorage.setItem('mema_dark_mode', dark ? '1' : '0'); } catch(e) {}
+}
+
+function toggleDayNight() {
+  hapticFeedback('light');
+  applyDayNightMode(!isDarkMode);
+}
+
+function loadDayNightPreference() {
+  var pref = true;
+  try {
+    var saved = localStorage.getItem('mema_dark_mode');
+    if (saved !== null) pref = saved === '1';
+    else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) pref = false;
+  } catch(e) {}
+  applyDayNightMode(pref);
+}
+
+function hapticFeedback(type) {
+  if ('vibrate' in navigator) {
+    try {
+      if (type === 'light') navigator.vibrate(10);
+      else if (type === 'medium') navigator.vibrate(20);
+      else if (type === 'heavy') navigator.vibrate([30, 10, 30]);
+      else navigator.vibrate(15);
+    } catch(e) {}
+  }
+}
+
+function formatDistance(meters) {
+  if (meters < 1000) return Math.round(meters) + 'm';
+  return (meters / 1000).toFixed(1) + 'km';
+}
+
+function formatWalkTime(meters) {
+  var minutes = Math.round(meters / 1.4 / 60);
+  if (minutes < 1) return '< 1 min';
+  return minutes + ' min de mers';
+}
+
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+
+function updateAuthStepper(step) {
+  const dot1 = document.getElementById('stepDot1');
+  const dot2 = document.getElementById('stepDot2');
+  const dot3 = document.getElementById('stepDot3');
+  const line1 = document.getElementById('stepLine1');
+  const line2 = document.getElementById('stepLine2');
+  if (!dot1 || !dot2 || !dot3) return;
+  if (step === 1) {
+    dot1.className = 'auth-step-dot active'; dot1.textContent = '1';
+    dot2.className = 'auth-step-dot'; dot2.textContent = '2';
+    dot3.className = 'auth-step-dot'; dot3.textContent = '3';
+    line1.className = 'auth-step-line';
+    line2.className = 'auth-step-line';
+  } else if (step === 2) {
+    dot1.className = 'auth-step-dot completed'; dot1.innerHTML = '&#10003;';
+    dot2.className = 'auth-step-dot active'; dot2.textContent = '2';
+    dot3.className = 'auth-step-dot'; dot3.textContent = '3';
+    line1.className = 'auth-step-line completed';
+    line2.className = 'auth-step-line';
+  } else if (step === 3) {
+    dot1.className = 'auth-step-dot completed'; dot1.innerHTML = '&#10003;';
+    dot2.className = 'auth-step-dot completed'; dot2.innerHTML = '&#10003;';
+    dot3.className = 'auth-step-dot active'; dot3.innerHTML = '&#10003;';
+    line1.className = 'auth-step-line completed';
+    line2.className = 'auth-step-line completed';
+  }
+}
+
+function getStarSVG(filled) {
+  const color = filled ? '#e8d080' : '#444';
+  return '<svg viewBox="0 0 24 24" width="16" height="16" fill="' + color + '"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>';
+}
+
+function updateSliderTrackFill(slider) {
+  const min = slider.min ? parseFloat(slider.min) : 0;
+  const max = slider.max ? parseFloat(slider.max) : 100;
+  const val = parseFloat(slider.value);
+  const percentage = ((val - min) / (max - min)) * 100;
+  slider.style.setProperty('--progress', percentage + '%');
+}
+
+const els = {
+  introScreen: document.getElementById('introScreen'),
+  authScreen: document.getElementById('authScreen'),
+  merchantDashboard: document.getElementById('merchantDashboard'),
+  clientSettingsScreen: document.getElementById('clientSettingsScreen'),
+  panelContainer: document.getElementById('panelContainer'),
+  contentArea: document.getElementById('contentArea'),
+  swipeArea: document.getElementById('swipeArea'),
+  swipeArrow: document.getElementById('swipeArrow'),
+  swipeHint: document.getElementById('swipeHint'),
+  radiusSlider: document.getElementById('radiusSlider'),
+  radiusValue: document.getElementById('radiusValue'),
+  budgetSlider: document.getElementById('budgetSlider'),
+  budgetValue: document.getElementById('budgetValue'),
+  status: document.getElementById('status'),
+  infoCard: document.getElementById('infoCard'),
+  placeName: document.getElementById('placeName'),
+  placePrice: document.getElementById('placePrice'),
+  placeAddress: document.getElementById('placeAddress'),
+  placeRating: document.getElementById('placeRating'),
+  authTypeBadge: document.getElementById('authTypeBadge'),
+  authSubtitle: document.getElementById('authSubtitle'),
+  phoneStep: document.getElementById('phoneStep'),
+  otpStep: document.getElementById('otpStep'),
+  phoneInput: document.getElementById('phoneInput'),
+  phoneError: document.getElementById('phoneError'),
+  phoneInfo: document.getElementById('phoneInfo'),
+  otpError: document.getElementById('otpError'),
+  otpInfo: document.getElementById('otpInfo'),
+  sendOtpBtn: document.getElementById('sendOtpBtn'),
+  verifyOtpBtn: document.getElementById('verifyOtpBtn'),
+  locationForm: document.getElementById('locationForm'),
+  offersForm: document.getElementById('offersForm'),
+  statsForm: document.getElementById('statsForm'),
+  offersList: document.getElementById('offersList'),
+  searchBtn: document.getElementById('searchBtn'),
+  toast: document.getElementById('toast')
+};
+
+function initSupabase() {
+  // Validare cheie - trebuie sa fie JWT valid (incepe cu eyJ)
+  const isValidKey = SUPABASE_ANON_KEY && SUPABASE_ANON_KEY.startsWith('eyJ') && SUPABASE_ANON_KEY.includes('.');
+  if (SUPABASE_URL.includes('YOUR_PROJECT') || SUPABASE_ANON_KEY.includes('YOUR_KEY') || !isValidKey) {
+    console.warn('Cheia Supabase ANON_KEY nu este configurata corect! Trebuie sa fie un JWT valid (incepe cu eyJ...)');
+    showToast('Eroare config: Cheia Supabase nu este setata corect! Verifica codul.', 'error');
+    // Permitem continuarea in modul DEMO daca cheia e invalida
+    return false;
+  }
+  try {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }
+    });
+    console.log('Supabase conectat cu succes');
+    return true;
+  } catch(e) {
+    console.error('Eroare Supabase:', e);
+    showToast('Eroare conexiune Supabase: ' + e.message, 'error');
+    return false;
+  }
+}
+
+function showToast(msg, type) {
+  const t = els.toast;
+  t.textContent = msg;
+  t.className = 'toast ' + (type || '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function selectUserType(type) {
+  hapticFeedback('medium');
+  currentUserType = type;
+  els.introScreen.classList.add('hidden');
+  els.authScreen.classList.add('visible');
+  if (type === 'merchant') {
+    els.authTypeBadge.textContent = 'COMERCIANT';
+    els.authTypeBadge.className = 'auth-type-badge merchant';
+  } else {
+    els.authTypeBadge.textContent = 'CLIENT';
+    els.authTypeBadge.className = 'auth-type-badge client';
+  }
+  setTimeout(() => els.phoneInput.focus(), 100);
+}
+
+
+function backToIntroFromAuth() {
+  els.authScreen.classList.remove('visible');
+  els.introScreen.classList.remove('hidden');
+  resetAuthForm();
+}
+
+function resetAuthForm() {
+  els.phoneStep.style.display = 'block';
+  els.otpStep.style.display = 'none';
+  els.phoneInput.value = '';
+  els.phoneError.textContent = '';
+  els.phoneInfo.textContent = '';
+  els.otpError.textContent = '';
+  els.otpInfo.textContent = '';
+  for (let i = 1; i <= 6; i++) document.getElementById('otp' + i).value = '';
+}
+
+async function sendOTP() {
+  const phone = els.phoneInput.value.trim();
+  if (!phone || phone.length < 9) { els.phoneError.textContent = 'Introdu un numar valid de 9 cifre'; return; }
+  if (!/^[7][0-9]{8}$/.test(phone)) { els.phoneError.textContent = 'Numar invalid. Ex: 7xx xxx xxx'; return; }
+  els.phoneError.textContent = '';
+  els.sendOtpBtn.disabled = true;
+  els.sendOtpBtn.textContent = 'Se trimite...';
+  const fullPhone = '+40' + phone;
+
+  if (AUTH_MODE === 'demo') {
+    setTimeout(() => {
+      tempOtpCode = '123456';
+      els.phoneStep.style.display = 'none';
+      els.otpStep.style.display = 'block';
+      els.sendOtpBtn.disabled = false;
+      els.sendOtpBtn.textContent = 'Trimite cod SMS';
+      document.getElementById('otp1').focus();
+      els.otpInfo.textContent = 'Cod demo: 123456';
+    }, 1000);
+    return;
+  }
+
+  // Mod real - verificam daca Supabase e initializat
+  if (!supabaseClient) {
+    els.phoneError.textContent = 'Eroare: Supabase nu este configurat corect. Verifica cheia ANON.';
+    els.sendOtpBtn.disabled = false;
+    els.sendOtpBtn.textContent = 'Trimite cod SMS';
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithOtp({ phone: fullPhone });
+    if (error) {
+      console.error('Eroare OTP:', error);
+      els.phoneError.textContent = 'Eroare: ' + error.message;
+      els.sendOtpBtn.disabled = false;
+      els.sendOtpBtn.textContent = 'Trimite cod SMS';
+      return;
+    }
+    els.phoneStep.style.display = 'none';
+    els.otpStep.style.display = 'block';
+    els.sendOtpBtn.disabled = false;
+    els.sendOtpBtn.textContent = 'Trimite cod SMS';
+    document.getElementById('otp1').focus();
+    els.otpInfo.textContent = 'Cod SMS trimis la ' + fullPhone;
+  } catch (e) {
+    console.error('Eroare retea OTP:', e);
+    els.phoneError.textContent = 'Eroare de retea. Incearca din nou.';
+    els.sendOtpBtn.disabled = false;
+    els.sendOtpBtn.textContent = 'Trimite cod SMS';
+  }
+}
+
+function handleOtpInput(input, index) {
+  input.value = input.value.replace(/[^0-9]/g, '');
+  if (input.value.length === 1 && index < 6) document.getElementById('otp' + (index + 1)).focus();
+  const allFilled = Array.from({length: 6}, (_, i) => document.getElementById('otp' + (i + 1)).value).every(v => v.length === 1);
+  if (allFilled) verifyOTP();
+}
+
+function backToPhone() {
+  els.otpStep.style.display = 'none';
+  els.phoneStep.style.display = 'block';
+  els.otpError.textContent = '';
+  els.otpInfo.textContent = '';
+}
+
+async function verifyOTP() {
+  const otp = Array.from({length: 6}, (_, i) => document.getElementById('otp' + (i + 1)).value).join('');
+  if (otp.length !== 6) { els.otpError.textContent = 'Introdu toate cele 6 cifre'; return; }
+  els.verifyOtpBtn.disabled = true;
+  els.verifyOtpBtn.textContent = 'Se verifica...';
+
+  if (AUTH_MODE === 'demo') {
+    if (otp === '123456') {
+      currentUser = { id: generateUUID(), phone: '+40' + els.phoneInput.value.trim(), type: currentUserType, email: null, role: currentUserType };
+      currentSession = { user: currentUser };
+      completeAuth();
+    } else {
+      els.otpError.textContent = 'Cod incorect. Incearca din nou.';
+      els.verifyOtpBtn.disabled = false;
+      els.verifyOtpBtn.textContent = 'Verifica codul';
+    }
+    return;
+  }
+
+  if (!supabaseClient) {
+    els.otpError.textContent = 'Eroare: Supabase nu este configurat.';
+    els.verifyOtpBtn.disabled = false;
+    els.verifyOtpBtn.textContent = 'Verifica codul';
+    return;
+  }
+
+  const phone = '+40' + els.phoneInput.value.trim();
+  try {
+    const { data, error } = await supabaseClient.auth.verifyOtp({ phone: phone, token: otp, type: 'sms' });
+    if (error) {
+      console.error('Eroare verificare OTP:', error);
+      els.otpError.textContent = 'Cod incorect sau expirat. Incearca din nou.';
+      els.verifyOtpBtn.disabled = false;
+      els.verifyOtpBtn.textContent = 'Verifica codul';
+      return;
+    }
+    currentSession = data.session;
+    currentUser = { id: data.user.id, phone: data.user.phone, type: currentUserType, email: data.user.email, role: currentUserType };
+    await supabaseClient.auth.updateUser({ data: { user_type: currentUserType } });
+    completeAuth();
+  } catch (e) {
+    console.error('Eroare retea verificare:', e);
+    els.otpError.textContent = 'Eroare de retea. Incearca din nou.';
+    els.verifyOtpBtn.disabled = false;
+    els.verifyOtpBtn.textContent = 'Verifica codul';
+  }
+}
+
+async function completeAuth() {
+  console.log('Autentificare reusita:', currentUser);
+  showToast('Autentificare reusita!');
+  if (currentUserType === 'merchant') {
+    els.authScreen.classList.remove('visible');
+    els.merchantDashboard.classList.add('visible');
+    setTimeout(() => initMerchantMap(), 300);
+    await loadMerchantData();
+    await loadMerchantOffers();
+  } else {
+    els.authScreen.classList.remove('visible');
+    initClientApp();
+    await loadClientSettings();
+  }
+}
+
+async function logout() {
+  if (AUTH_MODE === 'real' && supabaseClient) {
+    try { await supabaseClient.auth.signOut(); } catch(e) { console.log('Logout error', e); }
+  }
+  currentSession = null; currentUser = null; currentUserType = null;
+  els.merchantDashboard.classList.remove('visible');
+  els.clientSettingsScreen.classList.remove('visible');
+  if (map) { map.remove(); map = null; }
+  if (merchantMap) { merchantMap.remove(); merchantMap = null; }
+  userMarker = null; radiusCircle = null; placeMarkers = [];
+  currentLat = null; currentLng = null; isMinimized = false;
+  els.panelContainer.classList.remove('minimized');
+  els.swipeArrow.textContent = '⇡';
+  els.swipeHint.textContent = 'Swipe in sus pentru a minimiza';
+  resetAuthForm();
+  backToIntroFromAuth();
+  showToast('Deconectat cu succes');
+}
+
+// ============================================
+// MERCHANT DASHBOARD
+// ============================================
+function switchTab(tab) {
+  document.querySelectorAll('.merchant-tab').forEach(t => t.classList.remove('active'));
+  els.locationForm.style.display = 'none';
+  els.offersForm.style.display = 'none';
+  els.statsForm.style.display = 'none';
+  if (tab === 'location') { 
+    document.getElementById('tabLocation').classList.add('active'); 
+    els.locationForm.style.display = 'block'; 
+    setTimeout(() => { if(merchantMap) merchantMap.invalidateSize(); }, 100);
+  }
+  else if (tab === 'offers') { document.getElementById('tabOffers').classList.add('active'); els.offersForm.style.display = 'block'; loadMerchantOffers(); }
+  else if (tab === 'stats') { document.getElementById('tabStats').classList.add('active'); els.statsForm.style.display = 'block'; loadMerchantStats(); }
+}
+
+function initMerchantMap() {
+  if (merchantMap) return;
+  const container = document.getElementById('merchantMapPicker');
+  if (!container) return;
+  merchantMap = L.map('merchantMapPicker').setView([44.4325, 26.1038], 13);
+  merchantTileLayer = L.tileLayer(getTileUrl(isDarkMode), { maxZoom: 19, attribution: '' }).addTo(merchantMap);
+
+  const icon = L.divIcon({ html: '<div style="width:24px;height:24px;background:#e8b89a;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>', className: '', iconSize: [24, 24], iconAnchor: [12, 12] });
+  merchantMapMarker = L.marker([44.4325, 26.1038], {icon, draggable: true}).addTo(merchantMap);
+
+  merchantMapMarker.on('dragend', function(e) {
+    const pos = e.target.getLatLng();
+    document.getElementById('locLat').value = pos.lat.toFixed(6);
+    document.getElementById('locLng').value = pos.lng.toFixed(6);
+    document.getElementById('coordHint').textContent = 'Pin mutat manual. Coordonate actualizate.';
+    document.getElementById('coordHint').style.color = '#6ec4a0';
+  });
+}
+
+async function geocodeAddress() {
+  const address = document.getElementById('locAddress').value.trim();
+  if (!address || !merchantMap || !merchantMapMarker) return;
+  try {
+    const geoRes = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(address + ', Romania') + '&limit=1');
+    const geoData = await geoRes.json();
+    if (geoData && geoData.length > 0) {
+      const lat = parseFloat(geoData[0].lat);
+      const lng = parseFloat(geoData[0].lon);
+      merchantMap.setView([lat, lng], 16);
+      merchantMapMarker.setLatLng([lat, lng]);
+      document.getElementById('locLat').value = lat.toFixed(6);
+      document.getElementById('locLng').value = lng.toFixed(6);
+      document.getElementById('coordHint').textContent = 'Adresa gasita automat pe harta.';
+      document.getElementById('coordHint').style.color = '#6ec4a0';
+    } else {
+      document.getElementById('coordHint').textContent = 'Adresa nu a fost gasita. Muta pin-ul rosu manual pe harta.';
+      document.getElementById('coordHint').style.color = '#e07050';
+    }
+  } catch (e) {
+    console.log('Geocodificare esuata:', e);
+    document.getElementById('coordHint').textContent = 'Eroare geocodificare. Muta pin-ul manual.';
+    document.getElementById('coordHint').style.color = '#e07050';
+  }
+}
+
+async function loadMerchantData() {
+  if (!supabaseClient || !currentUser) return;
+  try {
+    const { data, error } = await supabaseClient.from('merchant_locations').select('*').eq('merchant_id', currentUser.id).single();
+    if (error && error.code !== 'PGRST116') { console.error('Eroare incarcare date:', error); return; }
+    if (data) {
+      document.getElementById('locName').value = data.name || '';
+      document.getElementById('locAddress').value = data.address || '';
+      document.getElementById('locPhone').value = data.phone || '';
+      document.getElementById('locDesc').value = data.description || '';
+      document.getElementById('locLogoUrl').value = data.logo_url || '';
+      if (data.lat && data.lng) {
+        document.getElementById('locLat').value = data.lat;
+        document.getElementById('locLng').value = data.lng;
+        if (merchantMap && merchantMapMarker) {
+          merchantMap.setView([data.lat, data.lng], 16);
+          merchantMapMarker.setLatLng([data.lat, data.lng]);
+        }
+      }
+      const isActive = data.subscription_status === 'active' && (!data.subscription_expires_at || new Date(data.subscription_expires_at) > new Date());
+      document.getElementById('subStatus').textContent = isActive ? 'Activ' : 'Inactiv';
+      document.getElementById('merchantRating').textContent = (data.rating_avg || 0).toFixed(1) + ' ' + String.fromCharCode(9733) + ' (' + (data.rating_count || 0) + ' review-uri)';
+    } else {
+      document.getElementById('subStatus').textContent = 'Nou - completeaza datele';
+      document.getElementById('merchantRating').textContent = '-';
+    }
+    const { count } = await supabaseClient.from('offers').select('*', { count: 'exact', head: true }).eq('merchant_id', currentUser.id).eq('status', 'active');
+    document.getElementById('merchantActiveOffers').textContent = count || 0;
+  } catch (e) { console.error('Eroare loadMerchantData:', e); }
+}
+
+async function saveLocation() {
+  const name = document.getElementById('locName').value.trim();
+  const address = document.getElementById('locAddress').value.trim();
+  const phone = document.getElementById('locPhone').value.trim();
+  const desc = document.getElementById('locDesc').value.trim();
+  const logoUrl = document.getElementById('locLogoUrl').value.trim();
+  let lat = parseFloat(document.getElementById('locLat').value) || null;
+  let lng = parseFloat(document.getElementById('locLng').value) || null;
+
+  if (!name || !address) { showToast('Completeaza numele si adresa localului!', 'error'); return; }
+  if (!lat || !lng) { showToast('Seteaza locatia pe harta sau introdu o adresa valida!', 'error'); return; }
+
+  const btn = document.getElementById('saveLocationBtn');
+  btn.disabled = true; btn.textContent = 'Se salveaza...';
+
+  const locationData = {
+    merchant_id: currentUser.id, name, address, phone, description: desc, lat, lng,
+    logo_url: logoUrl || null, subscription_status: 'active',
+    subscription_expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  };
+  try {
+    const { data, error } = await supabaseClient.from('merchant_locations').upsert(locationData, { onConflict: 'merchant_id' }).select();
+    if (error) { 
+      console.error('Eroare upsert location:', error);
+      showToast('Eroare la salvare: ' + error.message, 'error'); 
+      btn.disabled = false; btn.textContent = 'Salveaza localul'; 
+      return; 
+    }
+    showToast('Local salvat cu succes!');
+    await loadMerchantData();
+  } catch (e) { 
+    console.error('Eroare saveLocation:', e);
+    showToast('Eroare de retea: ' + e.message, 'error'); 
+  }
+  btn.disabled = false; btn.textContent = 'Salveaza localul';
+}
+
+async function createOffer() {
+  const title = document.getElementById('offerTitle').value.trim();
+  const description = document.getElementById('offerDescription').value.trim();
+  const originalPrice = parseFloat(document.getElementById('offerOriginalPrice').value) || null;
+  const discountedPrice = parseFloat(document.getElementById('offerDiscountedPrice').value) || null;
+  const discount = parseInt(document.getElementById('offerDiscount').value) || null;
+  const category = document.getElementById('offerCategory').value;
+  const radius = parseInt(document.getElementById('offerRadius').value);
+  const expiresAt = document.getElementById('offerExpires').value;
+  const imageUrl = document.getElementById('offerImageUrl').value.trim() || null;
+  if (!title || !description) { showToast('Completeaza titlul si descrierea!', 'error'); return; }
+  if (radius < 10 || radius > 5000) { showToast('Raza trebuie sa fie intre 10m si 5km!', 'error'); return; }
+  const btn = document.getElementById('createOfferBtn');
+  btn.disabled = true; btn.textContent = 'Se creeaza...';
+  const offerData = {
+    merchant_id: currentUser.id, title, description, original_price: originalPrice,
+    discounted_price: discountedPrice, discount_percentage: discount, category,
+    radius_meters: radius, status: 'active',
+    expires_at: expiresAt ? new Date(expiresAt).toISOString() : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    image_url: imageUrl, send_notification: false, sent_count: 0, click_count: 0
+  };
+  try {
+    const { data, error } = await supabaseClient.from('offers').insert([offerData]).select();
+    if (error) { showToast('Eroare: ' + error.message, 'error'); btn.disabled = false; btn.textContent = 'Programeaza Oferta'; return; }
+    showToast('Oferta creata cu succes!');
+    document.getElementById('offerTitle').value = '';
+    document.getElementById('offerDescription').value = '';
+    document.getElementById('offerOriginalPrice').value = '';
+    document.getElementById('offerDiscountedPrice').value = '';
+    document.getElementById('offerDiscount').value = '';
+    document.getElementById('offerImageUrl').value = '';
+    document.getElementById('offerExpires').value = '';
+    document.getElementById('offerRadius').value = 50;
+    await loadMerchantOffers();
+  } catch (e) { showToast('Eroare de retea', 'error'); }
+  btn.disabled = false; btn.textContent = 'Programeaza Oferta';
+}
+
+async function loadMerchantOffers() {
+  if (!supabaseClient || !currentUser) return;
+  try {
+    const { data, error } = await supabaseClient.from('offers').select('*').eq('merchant_id', currentUser.id).order('created_at', { ascending: false });
+    if (error) { console.error('Eroare incarcare oferte:', error); return; }
+    merchantOffers = data || [];
+    renderOffersList();
+    updateOfferStats();
+  } catch (e) { console.error('Eroare loadMerchantOffers:', e); }
+}
+
+function renderOffersList() {
+  const container = els.offersList;
+  container.innerHTML = '';
+  if (merchantOffers.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#127919;</div><div>Nicio oferta creata inca</div></div>';
+    return;
+  }
+  merchantOffers.forEach(offer => {
+    const statusClass = 'status-' + offer.status;
+    const statusText = offer.status.toUpperCase();
+    const isExpired = offer.expires_at && new Date(offer.expires_at) < new Date();
+    const expiredText = isExpired ? ' (EXPIRATA)' : '';
+    const card = document.createElement('div');
+    card.className = 'offer-item-card';
+    const header = document.createElement('div');
+    header.className = 'offer-item-header';
+    const title = document.createElement('div');
+    title.className = 'offer-item-title';
+    title.textContent = offer.title;
+    const badge = document.createElement('span');
+    badge.className = 'offer-status-badge ' + statusClass;
+    badge.textContent = statusText + expiredText;
+    title.appendChild(badge);
+    header.appendChild(title);
+    card.appendChild(header);
+    const desc = document.createElement('div');
+    desc.className = 'offer-item-desc';
+    desc.textContent = offer.description;
+    card.appendChild(desc);
+    const meta = document.createElement('div');
+    meta.className = 'offer-item-meta';
+    if (offer.discounted_price) {
+      const priceSpan = document.createElement('span');
+      priceSpan.textContent = offer.discounted_price + ' lei';
+      meta.appendChild(priceSpan);
+    }
+    if (offer.discount_percentage) {
+      const discountSpan = document.createElement('span');
+      discountSpan.textContent = '-' + offer.discount_percentage + '%';
+      meta.appendChild(discountSpan);
+    }
+    const radiusSpan = document.createElement('span');
+    radiusSpan.textContent = offer.radius_meters + 'm';
+    meta.appendChild(radiusSpan);
+    const sentSpan = document.createElement('span');
+    sentSpan.textContent = offer.sent_count + ' trimise';
+    meta.appendChild(sentSpan);
+    const clickSpan = document.createElement('span');
+    clickSpan.textContent = offer.click_count + ' click';
+    meta.appendChild(clickSpan);
+    card.appendChild(meta);
+    const actions = document.createElement('div');
+    actions.className = 'offer-actions';
+    if (offer.status !== 'cancelled') {
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn-small btn-edit';
+      cancelBtn.textContent = 'Anuleaza';
+      cancelBtn.onclick = function() { cancelOffer(offer.id); };
+      actions.appendChild(cancelBtn);
+    }
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn-small btn-delete';
+    deleteBtn.textContent = 'Sterge';
+    deleteBtn.onclick = function() { deleteOffer(offer.id); };
+    actions.appendChild(deleteBtn);
+    card.appendChild(actions);
+    container.appendChild(card);
+  });
+}
+
+function updateOfferStats() {
+  const total = merchantOffers.length;
+  const active = merchantOffers.filter(o => o.status === 'active' && (!o.expires_at || new Date(o.expires_at) > new Date())).length;
+  const sent = merchantOffers.reduce((sum, o) => sum + (o.sent_count || 0), 0);
+  const clicks = merchantOffers.reduce((sum, o) => sum + (o.click_count || 0), 0);
+  document.getElementById('statTotalOffers').textContent = total;
+  document.getElementById('statActiveOffers').textContent = active;
+  document.getElementById('statSent').textContent = sent;
+  document.getElementById('statClicks').textContent = clicks;
+}
+
+async function cancelOffer(id) {
+  const offer = merchantOffers.find(o => o.id === id);
+  if (!offer || !confirm('Sigur vrei sa anulezi aceasta oferta?')) return;
+  try {
+    const { error } = await supabaseClient.from('offers').update({ status: 'cancelled' }).eq('id', id).eq('merchant_id', currentUser.id);
+    if (error) { showToast('Eroare: ' + error.message, 'error'); return; }
+    showToast('Oferta anulata'); await loadMerchantOffers();
+  } catch (e) { showToast('Eroare de retea', 'error'); }
+}
+
+async function deleteOffer(id) {
+  if (!confirm('Sigur vrei sa stergi definitiv aceasta oferta?')) return;
+  try {
+    const { error } = await supabaseClient.from('offers').delete().eq('id', id).eq('merchant_id', currentUser.id);
+    if (error) { showToast('Eroare: ' + error.message, 'error'); return; }
+    showToast('Oferta stearsa'); await loadMerchantOffers();
+  } catch (e) { showToast('Eroare de retea', 'error'); }
+}
+
+async function loadMerchantStats() {
+  if (!supabaseClient || !currentUser) return;
+  try {
+    const { data: locData } = await supabaseClient.from('merchant_locations').select('rating_avg, rating_count').eq('merchant_id', currentUser.id).single();
+    document.getElementById('statAvgRating').textContent = (locData?.rating_avg || 0).toFixed(1);
+    document.getElementById('statReviews').textContent = locData?.rating_count || 0;
+    const { data: reviews } = await supabaseClient.from('reviews').select('*').eq('merchant_id', currentUser.id).order('created_at', { ascending: false }).limit(10);
+    const reviewsContainer = document.getElementById('merchantReviewsList');
+    if (!reviews || reviews.length === 0) {
+      reviewsContainer.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#11088;</div><div>Niciun review inca</div></div>';
+    } else {
+      reviewsContainer.innerHTML = reviews.map(r => '<div class="review-item"><div class="review-stars">' + String.fromCharCode(9733).repeat(r.rating) + String.fromCharCode(9734).repeat(5 - r.rating) + '</div><div class="review-text">' + (r.comment || 'Fara comentariu') + '</div><div class="review-date">' + new Date(r.created_at).toLocaleDateString('ro-RO') + '</div></div>').join('');
+    }
+    const totalClicks = merchantOffers.reduce((sum, o) => sum + (o.click_count || 0), 0);
+    const totalSent = merchantOffers.reduce((sum, o) => sum + (o.sent_count || 0), 0);
+    const conversion = totalSent > 0 ? Math.round((totalClicks / totalSent) * 100) : 0;
+    document.getElementById('statConversion').textContent = conversion + '%';
+    document.getElementById('statViews').textContent = totalSent;
+  } catch (e) { console.error('Eroare stats:', e); }
+}
+
+// ============================================
+// CLIENT APP
+// ============================================
+function openClientSettings() { els.clientSettingsScreen.classList.add('visible'); }
+function closeClientSettings() { els.clientSettingsScreen.classList.remove('visible'); }
+function togglePushSetting() { clientSettings.pushEnabled = document.getElementById('settingPushEnabled').checked; }
+function updateSettingRadius(value) { document.getElementById('settingRadiusValue').textContent = parseInt(value) + ' m'; }
+function saveSettingRadius(value) { clientSettings.maxDistanceKm = parseInt(value) / 1000; }
+function savePriceSettings() { clientSettings.minPrice = document.getElementById('settingMinPrice').value || null; clientSettings.maxPrice = document.getElementById('settingMaxPrice').value || null; }
+function saveTimeSettings() { clientSettings.activeFrom = document.getElementById('settingActiveFrom').value; clientSettings.activeUntil = document.getElementById('settingActiveUntil').value; }
+
+function toggleCategory(el) {
+  el.classList.toggle('selected');
+  const value = el.dataset.value;
+  const index = clientSettings.categories.indexOf(value);
+  if (index > -1) { if (clientSettings.categories.length > 1) clientSettings.categories.splice(index, 1); }
+  else clientSettings.categories.push(value);
+}
+
+async function saveAllClientSettings() {
+  if (!supabaseClient || !currentUser) { showToast('Setari salvate local'); closeClientSettings(); return; }
+  try {
+    const settingsData = {
+      client_id: currentUser.id, push_enabled: clientSettings.pushEnabled,
+      max_distance_km: clientSettings.maxDistanceKm, min_price: clientSettings.minPrice,
+      max_price: clientSettings.maxPrice, active_from: clientSettings.activeFrom,
+      active_until: clientSettings.activeUntil, categories: clientSettings.categories
+    };
+    const { error } = await supabaseClient.from('client_preferences').upsert(settingsData, { onConflict: 'client_id' });
+    if (error) { showToast('Eroare: ' + error.message, 'error'); return; }
+    showToast('Setari salvate!'); closeClientSettings();
+  } catch (e) { showToast('Setari salvate local', 'error'); closeClientSettings(); }
+}
+
+async function loadClientSettings() {
+  if (!supabaseClient || !currentUser) {
+    document.querySelectorAll('.category-chip').forEach(chip => { if (clientSettings.categories.includes(chip.dataset.value)) chip.classList.add('selected'); });
+    return;
+  }
+  try {
+    const { data, error } = await supabaseClient.from('client_preferences').select('*').eq('client_id', currentUser.id).single();
+    if (data) {
+      clientSettings = { pushEnabled: data.push_enabled, maxDistanceKm: data.max_distance_km, minPrice: data.min_price, maxPrice: data.max_price, activeFrom: data.active_from, activeUntil: data.active_until, categories: data.categories || ['food'] };
+      document.getElementById('settingPushEnabled').checked = clientSettings.pushEnabled;
+      document.getElementById('settingRadius').value = clientSettings.maxDistanceKm * 1000;
+      document.getElementById('settingRadiusValue').textContent = (clientSettings.maxDistanceKm * 1000) + ' m';
+      document.getElementById('settingMinPrice').value = clientSettings.minPrice || '';
+      document.getElementById('settingMaxPrice').value = clientSettings.maxPrice || '';
+      document.getElementById('settingActiveFrom').value = clientSettings.activeFrom;
+      document.getElementById('settingActiveUntil').value = clientSettings.activeUntil;
+    }
+    document.querySelectorAll('.category-chip').forEach(chip => { if (clientSettings.categories.includes(chip.dataset.value)) chip.classList.add('selected'); });
+  } catch (e) { console.log('Setari implicite'); }
+}
+
+function initClientApp() { els.introScreen.classList.add('hidden'); initMap(); }
+
+function initMap() {
+  if (map) return;
+  map = L.map('map', {zoomControl: false}).setView([44.4325, 26.1038], 13);
+  currentTileLayer = L.tileLayer(getTileUrl(isDarkMode), { maxZoom: 19, attribution: '' }).addTo(map);
+  L.control.zoom({position: 'bottomright'}).addTo(map);
+  els.radiusSlider.addEventListener('input', function() {
+    els.radiusValue.textContent = this.value + ' m';
+    if (currentLat) updateCircle(parseInt(this.value));
+  });
+  els.budgetSlider.addEventListener('input', function() { els.budgetValue.textContent = this.value + ' lei'; });
+  map.on('click', () => { els.infoCard.classList.remove('visible'); });
+}
+
+function getLocation() {
+  if (!navigator.geolocation) { els.status.innerHTML = 'GPS indisponibil'; return; }
+  els.status.innerHTML = '<span class="loader"></span> Se obtine locatia...';
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      currentLat = pos.coords.latitude; currentLng = pos.coords.longitude;
+      map.setView([currentLat, currentLng], 16);
+      if (userMarker) map.removeLayer(userMarker);
+      const icon = L.divIcon({ html: '<div class="user-marker"></div>', className: '', iconSize: [24, 24], iconAnchor: [12, 12] });
+      userMarker = L.marker([currentLat, currentLng], {icon: icon, zIndexOffset: 1000}).addTo(map);
+      updateCircle(parseInt(els.radiusSlider.value));
+      els.status.innerHTML = 'Locatie obtinuta! Apasa CAUTA OFERTE';
+    },
+    function(err) { console.error(err); els.status.innerHTML = 'GPS indisponibil. Verifica permisiunile.'; },
+    {enableHighAccuracy: true, timeout: 10000, maximumAge: 0}
+  );
+}
+
+function updateCircle(radius) {
+  if (radiusCircle) map.removeLayer(radiusCircle);
+  radiusCircle = L.circle([currentLat, currentLng], { radius: radius, color: '#e8b89a', weight: 2, fillColor: '#e8b89a', fillOpacity: 0.1, dashArray: '5,5' }).addTo(map);
+  map.fitBounds(radiusCircle.getBounds(), {padding: [50,50]});
+}
+
+function getDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const phi1 = lat1 * Math.PI / 180;
+  const phi2 = lat2 * Math.PI / 180;
+  const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+  const deltaLambda = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(deltaPhi/2)**2 + Math.cos(phi1)*Math.cos(phi2)*Math.sin(deltaLambda/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+async function searchOffers() {
+  if (!currentLat) { els.status.innerHTML = 'Apasa mai intai LOCALIZEAZA-MA'; return; }
+  if (!supabaseClient) { els.status.innerHTML = 'Eroare: Supabase neconectat'; return; }
+
+  const radius = parseInt(els.radiusSlider.value);
+  const budget = parseInt(els.budgetSlider.value);
+  els.status.innerHTML = '<span class="loader"></span> Se cauta oferte...';
+  els.searchBtn.disabled = true;
+  placeMarkers.forEach(m => map.removeLayer(m));
+  placeMarkers = [];
+
+  try {
+    const nowISO = new Date().toISOString();
+
+    // PAS 1: Luam toate locatiile active
+    const { data: locations, error: locError } = await supabaseClient
+      .from('merchant_locations')
+      .select('*')
+      .eq('subscription_status', 'active')
+      .or('subscription_expires_at.is.null,subscription_expires_at.gt.' + nowISO);
+
+    if (locError) { 
+      console.error('Eroare locatii:', locError); 
+      els.status.innerHTML = 'Eroare la cautare locatii: ' + locError.message; 
+      els.searchBtn.disabled = false; 
+      return; 
+    }
+    if (!locations || locations.length === 0) { 
+      els.status.innerHTML = 'Nicio locatie activa in baza de date.'; 
+      els.searchBtn.disabled = false; 
+      return; 
+    }
+    console.log('Locatii active gasite:', locations.length);
+
+    // PAS 2: Luam toate ofertele active
+    const { data: offers, error: offError } = await supabaseClient
+      .from('offers')
+      .select('*')
+      .eq('status', 'active')
+      .or('expires_at.is.null,expires_at.gt.' + nowISO);
+
+    if (offError) { 
+      console.error('Eroare oferte:', offError); 
+      els.status.innerHTML = 'Eroare la cautare oferte: ' + offError.message; 
+      els.searchBtn.disabled = false; 
+      return; 
+    }
+    if (!offers || offers.length === 0) { 
+      els.status.innerHTML = 'Nicio oferta activa in baza de date.'; 
+      els.searchBtn.disabled = false; 
+      return; 
+    }
+    console.log('Oferte active gasite:', offers.length);
+
+    // PAS 3: Calculam distanta in JS si filtram
+    const R = 6371000;
+    
+
+    const merchantOffersMap = {};
+    offers.forEach(offer => {
+      if (!merchantOffersMap[offer.merchant_id]) merchantOffersMap[offer.merchant_id] = [];
+      merchantOffersMap[offer.merchant_id].push(offer);
+    });
+
+    const results = [];
+    locations.forEach(loc => {
+      if (!loc.lat || !loc.lng) {
+        console.warn('Locatie fara coordonate:', loc.name, loc.merchant_id);
+        return;
+      }
+      const dist = getDistance(currentLat, currentLng, loc.lat, loc.lng);
+      const locOffers = merchantOffersMap[loc.merchant_id] || [];
+      locOffers.forEach(offer => {
+        if (dist > Math.min(offer.radius_meters, radius)) return;
+        if (budget && offer.discounted_price && offer.discounted_price > budget) return;
+        if (clientSettings.categories.length > 0 && !clientSettings.categories.includes(offer.category)) return;
+        results.push({
+          ...offer, lat: loc.lat, lng: loc.lng, merchant_name: loc.name,
+          distance: dist, rating_avg: loc.rating_avg, rating_count: loc.rating_count, offers: locOffers
+        });
+      });
+    });
+
+    results.sort((a, b) => a.distance - b.distance);
+    console.log('Rezultate filtrate:', results.length);
+
+    if (results.length === 0) { 
+      els.status.innerHTML = 'Nicio oferta in zona. Mareste raza sau verifica categoriile!'; 
+      els.searchBtn.disabled = false; 
+      return; 
+    }
+
+    const seenMerchants = new Set();
+    results.forEach(item => {
+      if (seenMerchants.has(item.merchant_id)) return;
+      seenMerchants.add(item.merchant_id);
+      const bestOffer = item.offers.sort((a, b) => (a.discounted_price || 999) - (b.discounted_price || 999))[0];
+      const isPremium = (item.rating_avg || 0) >= 4.0 && (item.rating_count || 0) >= 10;
+      const pinHtml = '<div class="mema-pin ' + (isPremium ? 'premium' : '') + '"><div class="mema-marker"><span class="mema-price">' + (bestOffer.discounted_price || bestOffer.original_price || '?') + ' lei</span>' + (isPremium ? '<span class="mema-badge">&#128142;</span>' : '') + '</div></div>';
+      const icon = L.divIcon({ html: pinHtml, className: '', iconSize: [70, 54], iconAnchor: [35, 54] });
+      const marker = L.marker([item.lat, item.lng], {icon}).addTo(map);
+      marker.on('click', () => { selectedPlace = item; showPlaceInfo(item); });
+      placeMarkers.push(marker);
+    });
+
+    els.status.innerHTML = results.length + ' oferte gasite in ' + seenMerchants.size + ' locatii';
+  } catch (e) { 
+    console.error('Eroare searchOffers:', e); 
+    els.status.innerHTML = 'Eroare la cautare: ' + e.message; 
+  }
+  els.searchBtn.disabled = false;
+}
+
+async function showPlaceInfo(merchant) {
+  els.placeName.textContent = merchant.merchant_name || 'Local';
+  var distBadge = document.getElementById('distanceBadge');
+  if (distBadge) {
+    distBadge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg> ' + formatDistance(merchant.distance) + ' &bull; ' + formatWalkTime(merchant.distance);
+  }
+  let reviews = [];
+  try {
+    const { data } = await supabaseClient.from('reviews').select('*').eq('merchant_id', merchant.merchant_id).order('created_at', { ascending: false }).limit(5);
+    reviews = data || [];
+  } catch(e) { console.log('Eroare reviews:', e); }
+  const avgRating = reviews.length > 0 ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1) : 'Nou';
+  const starChar = String.fromCharCode(9733);
+  const emptyChar = String.fromCharCode(9734);
+  const roundedRating = Math.round(avgRating) || 0;
+  els.placeRating.innerHTML = '<span class="rating-stars">' + starChar.repeat(roundedRating) + emptyChar.repeat(5 - roundedRating) + '</span><span class="rating-count">' + avgRating + ' (' + reviews.length + ' review-uri)</span>';
+  const bestOffer = merchant.offers ? merchant.offers[0] : merchant;
+  var offerTitleEl = document.getElementById('placeOfferTitle');
+  var offerDescEl = document.getElementById('placeOfferDesc');
+  var offerMetaEl = document.getElementById('placeOfferMeta');
+  var origPriceEl = document.getElementById('placeOriginalPrice');
+  var discPriceEl = document.getElementById('placeDiscountedPrice');
+  var discBadgeEl = document.getElementById('placeDiscountBadge');
+  if (offerTitleEl) offerTitleEl.textContent = bestOffer.title || 'Oferta speciala';
+  if (offerDescEl) offerDescEl.textContent = bestOffer.description || '';
+  var catIcons = { food: '&#127828;', fashion: '&#128085;', electronics: '&#128187;', beauty: '&#128132;', sports: '&#9917;', home: '&#127968;', entertainment: '&#127916;', travel: '&#9992;&#65039;', health: '&#138;', other: '&#128230;' };
+  var catNames = { food: 'Mancare', fashion: 'Fashion', electronics: 'Electronice', beauty: 'Frumusete', sports: 'Sport', home: 'Casa', entertainment: 'Divertisment', travel: 'Travel', health: 'Sanatate', other: 'Altele' };
+  var cat = bestOffer.category || 'other';
+  if (offerMetaEl) {
+    var metaHtml = '<span class="offer-meta-badge category">' + (catIcons[cat] || '&#128230;') + ' ' + (catNames[cat] || 'Altele') + '</span>';
+    if (bestOffer.radius_meters) metaHtml += '<span class="offer-meta-badge radius">&#128205; ' + bestOffer.radius_meters + 'm raza</span>';
+    offerMetaEl.innerHTML = metaHtml;
+  }
+  if (origPriceEl) {
+    if (bestOffer.original_price && bestOffer.discounted_price && bestOffer.original_price > bestOffer.discounted_price) {
+      origPriceEl.textContent = bestOffer.original_price + ' lei'; origPriceEl.style.display = 'inline';
+    } else { origPriceEl.style.display = 'none'; }
+  }
+  if (discPriceEl) discPriceEl.textContent = (bestOffer.discounted_price || bestOffer.original_price || '?') + ' lei';
+  if (discBadgeEl) {
+    if (bestOffer.discount_percentage && bestOffer.discount_percentage > 0) {
+      discBadgeEl.textContent = '-' + bestOffer.discount_percentage + '%'; discBadgeEl.style.display = 'inline-flex';
+    } else { discBadgeEl.style.display = 'none'; }
+  }
+  if (merchant.address) { els.placeAddress.textContent = merchant.address; }
+  else { els.placeAddress.textContent = Math.round(merchant.distance) + 'm distanta'; }
+  const reviewsList = document.getElementById('reviewsList');
+  if (!reviews || reviews.length === 0) reviewsList.innerHTML = '<div style="color:#666;font-size:0.8rem;text-align:center;">Niciun review inca</div>';
+  else reviewsList.innerHTML = reviews.map(r => '<div class="review-item"><div class="review-stars">' + starChar.repeat(r.rating) + emptyChar.repeat(5 - r.rating) + '</div><div class="review-text">' + (r.comment || 'Fara comentariu') + '</div><div class="review-date">' + new Date(r.created_at).toLocaleDateString('ro-RO') + '</div></div>').join('');
+  currentStarRating = 0;
+  document.querySelectorAll('.star-btn').forEach((btn, i) => btn.classList.toggle('active', i < currentStarRating));
+  document.getElementById('reviewComment').value = '';
+  els.infoCard.classList.add('visible');
+}
+
+function setStarRating(rating) {
+  currentStarRating = rating;
+  document.querySelectorAll('.star-btn').forEach((btn, i) => btn.classList.toggle('active', i < rating));
+}
+
+async function submitReview() {
+  if (!currentUser || !selectedPlace) { showToast('Trebuie sa fii autentificat', 'error'); return; }
+  if (currentStarRating === 0) { showToast('Selecteaza un rating', 'error'); return; }
+  const comment = document.getElementById('reviewComment').value.trim();
+  try {
+    const { error } = await supabaseClient.from('reviews').insert([{
+      client_id: currentUser.id, merchant_id: selectedPlace.merchant_id,
+      rating: currentStarRating, comment: comment || null
+    }]);
+    if (error) { showToast('Eroare: ' + error.message, 'error'); return; }
+    showToast('Review trimis!');
+    currentStarRating = 0;
+    document.querySelectorAll('.star-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById('reviewComment').value = '';
+    showPlaceInfo(selectedPlace);
+  } catch (e) { showToast('Eroare de retea', 'error'); }
+}
+
+function navigate() {
+  if (!selectedPlace) return;
+  const url = 'https://www.google.com/maps/dir/?api=1&destination=' + selectedPlace.lat + ',' + selectedPlace.lng + '&travelmode=walking';
+  window.open(url, '_blank');
+  if (selectedPlace.offers && selectedPlace.offers[0] && supabaseClient) {
+    supabaseClient.rpc('increment_offer_clicks', { offer_id: selectedPlace.offers[0].id }).catch(e => console.log('Analytics click:', e));
+  }
+}
+
+function closeCard() { els.infoCard.classList.remove('visible'); }
+
+function initInfoCardDrag() {
+  const handle = document.getElementById('infoCardDragHandle');
+  if (!handle) return;
+  let startY = 0, currentY = 0, isDragging = false;
+  handle.addEventListener('touchstart', function(e) {
+    startY = e.changedTouches[0].screenY;
+    isDragging = true;
+    els.infoCard.classList.add('dragging');
+  }, {passive: true});
+  handle.addEventListener('touchmove', function(e) {
+    if (!isDragging) return;
+    currentY = e.changedTouches[0].screenY;
+    const diff = currentY - startY;
+    if (diff > 0) els.infoCard.style.transform = 'translateY(' + diff + 'px)';
+  }, {passive: true});
+  handle.addEventListener('touchend', function(e) {
+    if (!isDragging) return;
+    isDragging = false;
+    els.infoCard.classList.remove('dragging');
+    const diff = currentY - startY;
+    if (diff > 100) { closeCard(); els.infoCard.style.transform = ''; }
+    else { els.infoCard.style.transform = ''; }
+  }, {passive: true});
+}
+
+
+// ============================================
+// SWIPE HANDLING
+// ============================================
+function handleSwipe() {
+  const swipeThreshold = 50;
+  const diff = touchStartY - touchEndY;
+  if (Math.abs(diff) > swipeThreshold) {
+    if (diff > 0 && !isMinimized) minimizePanel();
+    else if (diff < 0 && isMinimized) expandPanel();
+  }
+}
+function minimizePanel() { isMinimized = true; els.panelContainer.classList.add('minimized'); els.swipeArrow.textContent = '⇣'; els.swipeHint.textContent = 'Swipe in jos pentru a deschide'; }
+function expandPanel() { isMinimized = false; els.panelContainer.classList.remove('minimized'); els.swipeArrow.textContent = '⇡'; els.swipeHint.textContent = 'Swipe in sus pentru a minimiza'; }
+function handleTouchStart(e) { if (e.target.classList.contains('menu-btn-in-swipe') || e.target.classList.contains('settings-btn-in-swipe')) return; touchStartY = e.changedTouches[0].screenY; isDragging = true; }
+function handleMouseDown(e) { if (e.target.classList.contains('menu-btn-in-swipe') || e.target.classList.contains('settings-btn-in-swipe')) return; touchStartY = e.screenY; isDragging = true; e.preventDefault(); }
+function handleTouchMove(e) { if (!isDragging) return; touchEndY = e.changedTouches[0].screenY; }
+function handleMouseMove(e) { if (!isDragging) return; touchEndY = e.screenY; }
+function handleTouchEnd(e) { if (!isDragging) return; isDragging = false; handleSwipe(); }
+function handleMouseUp(e) { if (!isDragging) return; isDragging = false; handleSwipe(); }
+
+els.swipeArea.addEventListener('touchstart', handleTouchStart, {passive: true});
+els.swipeArea.addEventListener('touchmove', handleTouchMove, {passive: true});
+els.swipeArea.addEventListener('touchend', handleTouchEnd, {passive: true});
+els.swipeArea.addEventListener('mousedown', handleMouseDown);
+document.addEventListener('mousemove', handleMouseMove);
+document.addEventListener('mouseup', handleMouseUp);
+
+// ============================================
+// INITIALIZARE
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+  initSupabase();
+  loadDayNightPreference();
+  console.log('MEMA v4.2 UI/UX initialized');
+  console.log('Auth mode:', AUTH_MODE);
+});
+
+
+// === PWA Service Worker Registration ===
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+
+</script>
+</body>
+</html>
